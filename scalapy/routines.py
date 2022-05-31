@@ -163,6 +163,7 @@ def eigh(A, B=None, lower=True, eigvals_only=False, overwrite_a=True, overwrite_
 
         # Check if matrix is square
         util.assert_square(B)
+        A.assert_same_distribution(B)
         assert A.global_shape == B.global_shape, 'Not the same global shape'
 
         B = B if overwrite_b else B.copy()

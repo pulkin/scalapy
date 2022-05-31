@@ -1,10 +1,10 @@
 import numpy as np
-import scipy.linalg as la
-
+import pytest
 from mpi4py import MPI
 
 from scalapy import core
 import scalapy.routines as rt
+from common import random_hermitian_distributed, random_hp_distributed
 
 
 comm = MPI.COMM_WORLD
@@ -16,107 +16,52 @@ if size != 4:
     raise Exception("Test needs 4 processes.")
 
 test_context = {"gridshape": (2, 2), "block_shape": (3, 3)}
-
-allclose = lambda a, b: np.allclose(a, b, rtol=1e-4, atol=1e-6)
-
-
-def cmp_evecs(z1, z2):
-    # As there is a freedom in the sign/phase convention (which seems to be
-    # different by LAPACK and ScaLAPACK), we need to check in a more
-    # sophisticated way.
-    c12 = np.dot(z1.T.conj(), z2)
-    c12 = np.abs(c12) - np.identity(z1.shape[0])
-    return (np.abs(c12) < 1e-6).all()
+multiple_shape_parameters = pytest.mark.parametrize("size,dtype,atol", [
+    (269, np.float32, 1e-3),
+    (270, np.float64, 1e-7),
+    (271, np.complex64, 1e-3),
+    (272, np.complex128, 1e-7),
+])
 
 
-def test_eigh_D():
+@multiple_shape_parameters
+def test_eigh(size, dtype, atol):
+    """Eigenvalue problem"""
     with core.shape_context(**test_context):
+        a_distributed, a = random_hermitian_distributed((size, size), dtype)
 
-        ns = 289
-
-        gA = np.random.standard_normal((ns, ns)).astype(np.float64)
-        gA = gA + gA.T  # Make symmetric
-        gA = np.asfortranarray(gA)
-
-        dA = core.DistributedMatrix.from_global_array(gA, rank=0)
-
-        evalsd, dZd = rt.eigh(dA)
-        gZd = dZd.to_global_array(rank=0)
+        vals, vecs_distributed = rt.eigh(a_distributed)
+        vecs = vecs_distributed.to_global_array(rank=0)
 
         if rank == 0:
-            evalsn, gZn = la.eigh(gA)
-
-            assert allclose(evalsn, evalsd)
-            assert cmp_evecs(gZn, gZd)
+            np.testing.assert_allclose(a @ vecs - vecs * vals[None, :], 0, err_msg=f"A @ v - val v = 0", atol=atol)
+            np.testing.assert_allclose(vecs.conj().T @ vecs, np.eye(size), err_msg=f"v.T @ v = I", atol=atol)
 
 
-def test_eigh_Z():
+@multiple_shape_parameters
+def test_eigh_generalized(size, dtype, atol):
+    """Generalized eigenvalue problem"""
     with core.shape_context(**test_context):
-
-        ns = 272
-
-        gA = np.random.standard_normal((ns, ns)).astype(np.float64)
-        gA = gA + 1.0J * np.random.standard_normal((ns, ns)).astype(np.float64)
-        gA = gA + gA.T.conj()  # Make Hermitian
-        gA = np.asfortranarray(gA)
-
-        dA = core.DistributedMatrix.from_global_array(gA, rank=0)
-
-        evalsd, dZd = rt.eigh(dA)
-        gZd = dZd.to_global_array(rank=0)
-
-        if rank == 0:
-            evalsn, gZn = la.eigh(gA)
-
-            assert allclose(evalsn, evalsd)
-            assert cmp_evecs(gZn, gZd)
-
-
-def test_eigh_d_generalized():
-    with core.shape_context(**test_context):
-
-        ns = 314
-
-        a = np.random.standard_normal((ns, ns)).astype(np.float64)
-        a += a.T  # Make symmetric
-        a = np.asfortranarray(a)
-
-        b = np.random.standard_normal((ns, ns)).astype(np.float64)
-        b += b.T
-        b = b @ b
-        b = np.asfortranarray(b)
-
-        a_distributed = core.DistributedMatrix.from_global_array(a, rank=0)
-        b_distributed = core.DistributedMatrix.from_global_array(b, rank=0)
+        a_distributed, a = random_hermitian_distributed((size, size), dtype)
+        b_distributed, b = random_hp_distributed((size, size), dtype)
 
         vals, vecs_distributed = rt.eigh(a_distributed, b_distributed)
         vecs = vecs_distributed.to_global_array(rank=0)
 
         if rank == 0:
-            np.testing.assert_allclose(a @ vecs - b @ vecs * vals[None, :], 0, err_msg=f"A @ v - val B @ v = 0", atol=1e-3)
-            np.testing.assert_allclose(vecs.T @ b @ vecs, np.eye(ns), err_msg=f"v.T @ b @ v = I", atol=1e-8)
+            np.testing.assert_allclose(a @ vecs - b @ vecs * vals[None, :], 0, err_msg=f"A @ v - val B @ v = 0", atol=atol)
+            np.testing.assert_allclose(vecs.conj().T @ b @ vecs, np.eye(size), err_msg=f"v.T @ b @ v = I", atol=atol)
 
 
-def test_eigh_z_generalized():
+def test_eigh_generalized_fail():
+    """Tests failing gracefully for non-matching block setup"""
     with core.shape_context(**test_context):
+        size = 270
+        dtype = np.complex128
+        a_distributed, a = random_hermitian_distributed((size, size), dtype)
 
-        ns = 176
+        with core.shape_context(gridshape=(2, 2), block_shape=(4, 4)):
+            b_distributed, b = random_hermitian_distributed((size, size), dtype)
 
-        a = np.random.standard_normal((ns, ns)).astype(np.float64) + 1.j * np.random.standard_normal((ns, ns)).astype(np.float64)
-        a += a.conj().T
-        a = np.asfortranarray(a)
-
-        b = np.random.standard_normal((ns, ns)).astype(np.float64) + 1.j * np.random.standard_normal((ns, ns)).astype(np.float64)
-        b += b.conj().T
-        b = b @ b
-        b = np.asfortranarray(b)
-
-        a_distributed = core.DistributedMatrix.from_global_array(a, rank=0)
-        b_distributed = core.DistributedMatrix.from_global_array(b, rank=0)
-
-        vals, vecs_distributed = rt.eigh(a_distributed, b_distributed)
-        vecs = vecs_distributed.to_global_array(rank=0)
-
-        if rank == 0:
-            np.testing.assert_allclose(a @ vecs - b @ vecs * vals[None, :], 0, err_msg=f"A @ v - val B @ v = 0", atol=1e-5)
-            np.testing.assert_allclose(vecs.conj().T @ b @ vecs, np.eye(ns), err_msg=f"v.T @ b @ v = I", atol=1e-8)
+        with pytest.raises(AssertionError):
+            rt.eigh(a_distributed, b_distributed)
