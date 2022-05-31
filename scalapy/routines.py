@@ -275,7 +275,7 @@ def dot(A, B, transA='N', transB='N'):
     -------
     C : DistributedMatrix
     """
-    return A.matmat(B, trans_a=transA, trans_b=transB)
+    return core.dot_mat_mat(A, B, trans_a=transA, trans_b=transB)
 
 
 def lu(A, overwrite_a=True):

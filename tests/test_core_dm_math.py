@@ -119,3 +119,41 @@ def test_neg(shape, dtype):
 
         if rank == 0:
             np.testing.assert_equal(n, -a)
+
+
+@multiple_shape_parameters
+def test_dot(shape, dtype):
+    """matrix-matrix multiplication (raw version): alpha * A @ B + beta * C"""
+    with core.shape_context(**test_context):
+        m, n = shape
+        k = (m + n) // 2  # does not mean anything particular
+        alpha = 1.1
+        beta = 8.0
+
+        a_distributed, a = random_distributed((n, k), dtype)
+        b_distributed, b = random_distributed((k, m), dtype)
+        c_distributed, c = random_distributed((n, m), dtype)
+
+        core.dot_mat_mat(a_distributed, b_distributed, alpha=alpha, beta=beta, out=c_distributed)
+        result = c_distributed.to_global_array(rank=0)
+
+        if rank == 0:
+            np.testing.assert_allclose(alpha * a @ b + beta * c, result,
+                                       atol=1e-5 if dtype in (np.float32, np.complex64) else 1e-12)
+
+
+@multiple_shape_parameters
+def test_dot_2(shape, dtype):
+    """matrix-matrix multiplication (dot version): A @ B"""
+    with core.shape_context(**test_context):
+        m, n = shape
+        k = (m + n) // 2  # does not mean anything particular
+
+        a_distributed, a = random_distributed((n, k), dtype)
+        b_distributed, b = random_distributed((k, m), dtype)
+        ab_distributed = a_distributed @ b_distributed
+
+        ab = ab_distributed.to_global_array(rank=0)
+
+        if rank == 0:
+            np.testing.assert_allclose(a @ b, ab, atol=1e-5 if dtype in (np.float32, np.complex64) else 1e-12)

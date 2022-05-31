@@ -965,67 +965,11 @@ class DistributedMatrix(MatrixLikeAlgebra):
         result.__iadd__(other, np_op=_rev_op, op_inplace=False)
         return result
 
-    def matmat(self, other, trans_a='N', trans_b='N', alpha=1., beta=0., out=None):
-        """
-        Matrix-matrix dot product.
-
-        Parameters
-        ----------
-        other : DistributedMatrix
-            Another distributed matrix to multiply by.
-        trans_a : str
-            An optional operation on self.
-        trans_b : str
-            An optional operation on other.
-        alpha : float
-            Pre-factor for the product.
-        beta : float
-            In case out is specified, the result will be
-            appended to ``out * beta``.
-        out : DistributedMatrix
-            The output array.
-
-        Returns
-        -------
-        result : DistributedMatrix
-            The resulting product.
-        """
-        # TODO: ScalapyExceptions should be just ValueErrors
-        if trans_a not in 'NTC':
-            raise ScalapyException(f"trans_a={trans_a} not in 'NTC'")
-        if trans_b not in 'NTC':
-            raise ScalapyException(f"trans_b={trans_b} not in 'NTC'")
-        self.assert_same_distribution(other)
-        if self.dtype != other.dtype:
-            raise ScalapyException(f"a.dtype={self.dtype} != b.dtype={other.dtype}")
-
-        m = self.global_shape[0] if trans_a == 'N' else self.global_shape[1]
-        n = other.global_shape[1] if trans_b == 'N' else other.global_shape[0]
-        k = self.global_shape[1] if trans_a == 'N' else self.global_shape[0]
-        l = other.global_shape[0] if trans_b == 'N' else other.global_shape[1]
-
-        if l != k:
-            raise ScalapyException(f"dimension mismatch a.shape={self.global_shape} trans_a={trans_a} and "
-                                   f"b.shape={other.global_shape} trans_b={trans_b}")
-
-        if out is not None:
-            self.assert_same_distribution(out)
-            if out.global_shape != (m, n):
-                raise ScalapyException(f"out.shape={out.global_shape} != {(m, n)}")
-            if self.dtype != out.dtype:
-                raise ScalapyException(f"a.dtype={self.dtype} != out.dtype={out.dtype}")
+    def __matmul__(self, other):
+        if isinstance(other, DistributedMatrix):
+            return dot_mat_mat(self, other)
         else:
-            out = DistributedMatrix([m, n], dtype=self.dtype, block_shape=self.block_shape, context=self.context)
-        args = [trans_a, trans_b, m, n, k, alpha, self, other, beta, out]
-
-        call_table = {'S': (ll.psgemm, args),
-                      'C': (ll.pcgemm, args),
-                      'D': (ll.pdgemm, args),
-                      'Z': (ll.pzgemm, args)}
-
-        func, args = call_table[self.sc_dtype]
-        func(*args)
-        return out
+            raise NotImplementedError(f"cannot matmul {other}")
 
     def _section(self, srow=0, nrow=None, scol=0, ncol=None):
         ## return a section [srow:srow+nrow, scol:scol+ncol] of the global array as a new distributed array
@@ -1492,8 +1436,6 @@ class DistributedMatrix(MatrixLikeAlgebra):
         if context.mpi_comm != self.context.mpi_comm:
             raise ScalapyException("Can only redsitribute over the same MPI communicator.")
 
-        from . import lowlevel as ll
-
         dm = DistributedMatrix(self.global_shape, dtype=self.dtype, block_shape=block_shape, context=context)
 
         args = [self.global_shape[0], self.global_shape[1], self, dm, self.context.blacs_context]
@@ -1586,3 +1528,67 @@ class DistributedMatrix(MatrixLikeAlgebra):
         """Hermitian conjugate the distributed matrix, i.e., transpose
         and complex conjugate the distributed matrix."""
         return self.hconj()
+
+
+def dot_mat_mat(a, b, trans_a='N', trans_b='N', alpha=1., beta=0., out=None):
+    """
+    Matrix-matrix dot product.
+
+    Parameters
+    ----------
+    a : DistributedMatrix
+    b : DistributedMatrix
+        Matrices to multiply.
+    trans_a : str
+        An optional operation on self.
+    trans_b : str
+        An optional operation on other.
+    alpha : float
+        Pre-factor for the product.
+    beta : float
+        In case out is specified, the result will be
+        appended to ``out * beta``.
+    out : DistributedMatrix
+        The output array.
+
+    Returns
+    -------
+    result : DistributedMatrix
+        The resulting product.
+    """
+    # TODO: ScalapyExceptions should be just ValueErrors
+    if trans_a not in 'NTC':
+        raise ScalapyException(f"trans_a={trans_a} not in 'NTC'")
+    if trans_b not in 'NTC':
+        raise ScalapyException(f"trans_b={trans_b} not in 'NTC'")
+    a.assert_same_distribution(b)
+    if a.dtype != b.dtype:
+        raise ScalapyException(f"a.dtype={a.dtype} != b.dtype={b.dtype}")
+
+    m = a.global_shape[0] if trans_a == 'N' else a.global_shape[1]
+    n = b.global_shape[1] if trans_b == 'N' else b.global_shape[0]
+    k = a.global_shape[1] if trans_a == 'N' else a.global_shape[0]
+    l = b.global_shape[0] if trans_b == 'N' else b.global_shape[1]
+
+    if l != k:
+        raise ScalapyException(f"dimension mismatch a.shape={a.global_shape} trans_a={trans_a} and "
+                               f"b.shape={b.global_shape} trans_b={trans_b}")
+
+    if out is not None:
+        a.assert_same_distribution(out)
+        if out.global_shape != (m, n):
+            raise ScalapyException(f"out.shape={out.global_shape} != {(m, n)}")
+        if a.dtype != out.dtype:
+            raise ScalapyException(f"a.dtype={a.dtype} != out.dtype={out.dtype}")
+    else:
+        out = DistributedMatrix([m, n], dtype=a.dtype, block_shape=a.block_shape, context=a.context)
+    args = [trans_a, trans_b, m, n, k, alpha, a, b, beta, out]
+
+    call_table = {'S': (ll.psgemm, args),
+                  'C': (ll.pcgemm, args),
+                  'D': (ll.pdgemm, args),
+                  'Z': (ll.pzgemm, args)}
+
+    func, args = call_table[a.sc_dtype]
+    func(*args)
+    return out
