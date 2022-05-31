@@ -881,7 +881,7 @@ class DistributedMatrix(object):
             return B
 
         elif isinstance(x, np.ndarray):
-            if x.ndim != 1 and x.size != self.global_shape[1]:
+            if x.ndim != 1 or x.size != self.global_shape[1]:
                 raise RuntimeError("scalapy.DistributedMatrix.__mul__: incompatible shapes")
 
             B = self.copy()
