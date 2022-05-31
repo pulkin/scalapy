@@ -93,7 +93,7 @@ def test_eigh_d_generalized():
         vecs = vecs_distributed.to_global_array(rank=0)
 
         if rank == 0:
-            np.testing.assert_allclose(a @ vecs - b @ vecs * vals[None, :], 0, err_msg=f"A @ v - val B @ v = 0", atol=1e-5)
+            np.testing.assert_allclose(a @ vecs - b @ vecs * vals[None, :], 0, err_msg=f"A @ v - val B @ v = 0", atol=1e-3)
             np.testing.assert_allclose(vecs.T @ b @ vecs, np.eye(ns), err_msg=f"v.T @ b @ v = I", atol=1e-8)
 
 
