@@ -43,6 +43,7 @@ from mpi4py import MPI
 from . import blockcyclic
 from . import blacs
 from . import mpi3util
+from . import lowlevel as ll
 
 
 class ScalapyException(Exception):
@@ -963,6 +964,68 @@ class DistributedMatrix(MatrixLikeAlgebra):
         result = self.copy()
         result.__iadd__(other, np_op=_rev_op, op_inplace=False)
         return result
+
+    def matmat(self, other, trans_a='N', trans_b='N', alpha=1., beta=0., out=None):
+        """
+        Matrix-matrix dot product.
+
+        Parameters
+        ----------
+        other : DistributedMatrix
+            Another distributed matrix to multiply by.
+        trans_a : str
+            An optional operation on self.
+        trans_b : str
+            An optional operation on other.
+        alpha : float
+            Pre-factor for the product.
+        beta : float
+            In case out is specified, the result will be
+            appended to ``out * beta``.
+        out : DistributedMatrix
+            The output array.
+
+        Returns
+        -------
+        result : DistributedMatrix
+            The resulting product.
+        """
+        # TODO: ScalapyExceptions should be just ValueErrors
+        if trans_a not in 'NTC':
+            raise ScalapyException(f"trans_a={trans_a} not in 'NTC'")
+        if trans_b not in 'NTC':
+            raise ScalapyException(f"trans_b={trans_b} not in 'NTC'")
+        self.assert_same_distribution(other)
+        if self.dtype != other.dtype:
+            raise ScalapyException(f"a.dtype={self.dtype} != b.dtype={other.dtype}")
+
+        m = self.global_shape[0] if trans_a == 'N' else self.global_shape[1]
+        n = other.global_shape[1] if trans_b == 'N' else other.global_shape[0]
+        k = self.global_shape[1] if trans_a == 'N' else self.global_shape[0]
+        l = other.global_shape[0] if trans_b == 'N' else other.global_shape[1]
+
+        if l != k:
+            raise ScalapyException(f"dimension mismatch a.shape={self.global_shape} trans_a={trans_a} and "
+                                   f"b.shape={other.global_shape} trans_b={trans_b}")
+
+        if out is not None:
+            self.assert_same_distribution(out)
+            if out.global_shape != (m, n):
+                raise ScalapyException(f"out.shape={out.global_shape} != {(m, n)}")
+            if self.dtype != out.dtype:
+                raise ScalapyException(f"a.dtype={self.dtype} != out.dtype={out.dtype}")
+        else:
+            out = DistributedMatrix([m, n], dtype=self.dtype, block_shape=self.block_shape, context=self.context)
+        args = [trans_a, trans_b, m, n, k, alpha, self, other, beta, out]
+
+        call_table = {'S': (ll.psgemm, args),
+                      'C': (ll.pcgemm, args),
+                      'D': (ll.pdgemm, args),
+                      'Z': (ll.pzgemm, args)}
+
+        func, args = call_table[self.sc_dtype]
+        func(*args)
+        return out
 
     def _section(self, srow=0, nrow=None, scol=0, ncol=None):
         ## return a section [srow:srow+nrow, scol:scol+ncol] of the global array as a new distributed array

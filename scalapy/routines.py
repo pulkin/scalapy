@@ -275,37 +275,7 @@ def dot(A, B, transA='N', transB='N'):
     -------
     C : DistributedMatrix
     """
-
-    if transA not in ['N', 'T', 'C']:
-        raise core.ScalapyException("Trans argument for matrix A invalid")
-    if transB not in ['N', 'T', 'C']:
-        raise core.ScalapyException("Trans argument for matrix B invalid")
-    if A.dtype != B.dtype:
-        raise core.ScalapyException("Matrices must have same type")
-    # Probably should validate context too
-
-    m = A.global_shape[0] if transA == 'N' else A.global_shape[1]
-    n = B.global_shape[1] if transB == 'N' else B.global_shape[0]
-    k = A.global_shape[1] if transA == 'N' else A.global_shape[0]
-    l = B.global_shape[0] if transB == 'N' else B.global_shape[1]
-
-    if l != k:
-        raise core.ScalapyException("Matrix shapes are incompatible.")
-
-    C = core.DistributedMatrix([m, n], dtype=A.dtype, block_shape=A.block_shape, context=A.context)
-
-    args = [transA, transB, m, n, k, 1.0, A, B, 0.0, C]
-
-    call_table = { 'S': (ll.psgemm, args),
-                   'C': (ll.pcgemm, args),
-                   'D': (ll.pdgemm, args),
-                   'Z': (ll.pzgemm, args) }
-
-
-    func, args = call_table[A.sc_dtype]
-    func(*args)
-
-    return C
+    return A.matmat(B, trans_a=transA, trans_b=transB)
 
 
 def lu(A, overwrite_a=True):
