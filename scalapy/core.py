@@ -248,8 +248,75 @@ class ProcessContext(object):
         self._all_mpi_ranks = np.zeros(self.grid_shape, dtype=int)
         self._all_mpi_ranks[self._all_grid_positions[:,0],self._all_grid_positions[:,1]] = np.arange(self.mpi_comm.size, dtype=int)
 
+    def __eq__(self, other):
+        if not isinstance(other, ProcessContext):
+            return False
+        return self.grid_shape == other.grid_shape and self.grid_position == other.grid_position
 
-class DistributedMatrix(object):
+    def __repr__(self):
+        return f"ProcessContext(rank={self.mpi_comm.rank}, grid={self.grid_shape}, grid_pos={self.grid_position})"
+
+
+class MatrixLikeAlgebra:
+    """Defines commuting and such"""
+    def copy(self):
+        """
+        A copy of this matrix.
+
+        Returns
+        -------
+        result : MatrixLikeAlgebra
+            A copy of this matrix.
+        """
+        raise NotImplementedError
+
+    def __iadd__(self, other):
+        raise NotImplementedError
+
+    def __add__(self, other):
+        result = self.copy()
+        result.__iadd__(other)
+        return result
+    __radd__ = __add__
+
+    def __isub__(self, other):
+        raise NotImplementedError
+
+    def __neg__(self):
+        raise NotImplementedError
+
+    def __sub__(self, other):
+        result = self.copy()
+        result.__isub__(other)
+        return result
+
+    def __rsub__(self, other):
+        result = self.__neg__()
+        result.__iadd__(other)
+        return result
+
+    def __imul__(self, other):
+        raise NotImplementedError
+
+    def __mul__(self, other):
+        result = self.copy()
+        result.__imul__(other)
+        return result
+    __rmul__ = __mul__
+
+    def __itruediv__(self, other):
+        raise NotImplementedError
+
+    def __truediv__(self, other):
+        result = self.copy()
+        result.__itruediv__(other)
+        return result
+
+    def __rtruediv__(self, other):
+        raise NotImplementedError
+
+
+class DistributedMatrix(MatrixLikeAlgebra):
     r"""A matrix distributed over multiple MPI processes.
 
     Parameters
@@ -839,58 +906,63 @@ class DistributedMatrix(object):
 
         return global_array
 
+    def assert_same_distribution(self, *args):
+        """
+        Assert same distribution and parallel blocking scheme.
 
-    def __iadd__(self, x):
-        assert isinstance(x, DistributedMatrix)
+        Parameters
+        ----------
+        args
+            Other distributed matrices to compare to.
+        """
+        for x in args:
+            assert self.block_shape == x.block_shape, f"block_shape mismatch: {self.block_shape} vs {x.block_shape}"
+            assert self.context == x.context, f"context mismatch: {self.context} vs {x.context}"
 
-        if self.global_shape != x.global_shape:
-            raise RuntimeError("scalapy.DistributedMatrix.__iadd__: incompatible shapes")
-
-        if ((self.block_shape != x.block_shape)
-            or (self.context.grid_shape != x.context.grid_shape)
-            or (self.context.grid_position != x.context.grid_position)):
-            raise RuntimeError("scalapy.DistributedMatrix.__iadd__: for now, both matrices must have same blocking scheme")
-
-        # Note: OK if dtypes don't match
-        self.local_array[:] += x.local_array[:]
-
-        return self
-
-
-    def __mul__(self, x):
+    def __iadd__(self, x, np_op=np.ndarray.__iadd__, op_inplace=True):
         if isinstance(x, DistributedMatrix):
             if self.global_shape != x.global_shape:
-                raise RuntimeError("scalapy.DistributedMatrix.__mul__: incompatible shapes")
-
-            if ((self.block_shape != x.block_shape)
-                or (self.context.grid_shape != x.context.grid_shape)
-                or (self.context.grid_position != x.context.grid_position)):
-                raise RuntimeError("scalapy.DistributedMatrix.__mul__: for now, both matrices must have same blocking scheme")
-
-            B = self.copy()
-
-            # Note: OK if dtypes don't match
-            B.local_array[:] *= x.local_array[:]
-
-            return B
+                raise ValueError(f"operands have different shapes: {self.global_shape}, {x.global_shape}")
+            self.assert_same_distribution(x)
+            op_result = np_op(self.local_array, x.local_array)
+            if not op_inplace:
+                self.local_array[:] = op_result
 
         elif isinstance(x, Number):
-            B = self.copy()
-            B.local_array[:] *= x
+            op_result = np_op(self.local_array, x)
+            if not op_inplace:
+                self.local_array[:] = op_result
 
-            return B
-
-        elif isinstance(x, np.ndarray):
-            if x.ndim != 1 or x.size != self.global_shape[1]:
-                raise RuntimeError("scalapy.DistributedMatrix.__mul__: incompatible shapes")
-
-            B = self.copy()
-            for (i, col) in enumerate(self.col_indices()):
-                B.local_array[:, i] *= x[col]
-
-            return B
         else:
-            raise RuntimeError('Unsupported type %s' % type(x))
+            raise NotImplementedError(f"cannot add {x}")
+
+    def __neg__(self):
+        result = self.copy()
+        np.negative(result.local_array, out=result.local_array)
+        return result
+
+    def __isub__(self, other):
+        self.__iadd__(other, np_op=np.ndarray.__isub__)
+
+    def __imul__(self, x):
+        if isinstance(x, np.ndarray):  # TODO: this does not belong to here
+            if x.ndim != 1 or x.size != self.global_shape[1]:
+                raise ValueError("scalapy.DistributedMatrix.__mul__: incompatible shapes")
+            for (i, col) in enumerate(self.col_indices()):
+                self.local_array[:, i] *= x[col]
+
+        else:
+            self.__iadd__(x, np_op=np.ndarray.__imul__)
+
+    def __itruediv__(self, other):
+        self.__iadd__(other, np_op=np.ndarray.__itruediv__)
+
+    def __rtruediv__(self, other):
+        def _rev_op(a, b):
+            return b / a
+        result = self.copy()
+        result.__iadd__(other, np_op=_rev_op, op_inplace=False)
+        return result
 
     def _section(self, srow=0, nrow=None, scol=0, ncol=None):
         ## return a section [srow:srow+nrow, scol:scol+ncol] of the global array as a new distributed array
