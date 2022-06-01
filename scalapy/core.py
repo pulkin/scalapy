@@ -965,11 +965,25 @@ class DistributedMatrix(MatrixLikeAlgebra):
         result.__iadd__(other, np_op=_rev_op, op_inplace=False)
         return result
 
-    def __matmul__(self, other):
+    def dot(self, other):
+        """
+        Dot product.
+
+        Parameters
+        ----------
+        other
+            Another matrix to take the product with.
+
+        Returns
+        -------
+        result
+            The result of the product.
+        """
         if isinstance(other, DistributedMatrix):
             return dot_mat_mat(self, other)
         else:
             raise NotImplementedError(f"cannot matmul {other}")
+    __matmul__ = dot
 
     def _section(self, srow=0, nrow=None, scol=0, ncol=None):
         ## return a section [srow:srow+nrow, scol:scol+ncol] of the global array as a new distributed array
