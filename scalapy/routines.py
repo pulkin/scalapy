@@ -310,6 +310,7 @@ def lu(A, overwrite_a=True):
         the distributed matrix A.
 
     """
+    # TODO: fix what LU returns
 
     A = A if overwrite_a else A.copy()
 
@@ -404,8 +405,7 @@ def inv(A, overwrite_a=True):
     """Computes the inverse of a LU-factored distributed matrix.
 
     Computes the inverse of a general distributed matrix A using the
-    LU factorization. This method inverts U and then computes the
-inverse
+    LU factorization. This method inverts U and then computes the inverse
     of A by solving the system inv(A)*L = inv(U) for inv(A).
 
     Parameters
@@ -420,11 +420,6 @@ inverse
     -------
     inv : DistributedMatrix
         The inverse of `A`.
-    ipiv : np.ndarray
-        Array contains the pivoting information. If ipiv[i]=j, then
-        the local row i was swapped with the global row j.
-        This array is tied to the distributed matrix A.
-
     """
 
     # Check if matrix is square
@@ -464,7 +459,7 @@ inverse
     if info < 0:
         raise core.ScalapackException("Failure.")
 
-    return A, ipiv
+    return A
 
 
 def triinv(A, lower=False, unit_triangular=False, overwrite_a=True):
