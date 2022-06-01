@@ -981,8 +981,6 @@ class DistributedMatrix(MatrixLikeAlgebra):
 
         args = [nrow, ncol, self._local_array , srow+1, scol+1, self.desc, B._local_array, 1, 1, B.desc, self.context.blacs_context]
 
-        from . import lowlevel as ll
-
         call_table = {'S': (ll.psgemr2d, args),
                       'D': (ll.pdgemr2d, args),
                       'C': (ll.pcgemr2d, args),
@@ -1010,8 +1008,6 @@ class DistributedMatrix(MatrixLikeAlgebra):
                 self._local_array, srow+1, scol+1, self.desc,
                 B._local_array, srowb+1, scolb+1, B.desc,
                 self.context.blacs_context]
-
-        from . import lowlevel as ll
 
         call_table = {'S': (ll.psgemr2d, args),
                       'D': (ll.pdgemr2d, args),
@@ -1245,8 +1241,6 @@ class DistributedMatrix(MatrixLikeAlgebra):
                     desc[1] = -1
                     args = [M, N, np.zeros(1, dtype=self.dtype) , asrow+1+bm*bri, ascol+1+bn*bci, desc, self._local_array, srow+1+bm*bri, scol+1+bn*bci, self.desc, self.context.blacs_context]
 
-                from . import lowlevel as ll
-
                 call_table = {'S': (ll.psgemr2d, args),
                               'D': (ll.pdgemr2d, args),
                               'C': (ll.pcgemr2d, args),
@@ -1324,8 +1318,6 @@ class DistributedMatrix(MatrixLikeAlgebra):
                     desc = np.zeros(9, dtype=np.int32)
                     desc[1] = -1
                     args = [M, N, self._local_array, srow+1+bm*bri, scol+1+bn*bci, self.desc, np.zeros(1, dtype=self.dtype) , 1+bm*bri, 1+bn*bci, desc, self.context.blacs_context]
-
-                from . import lowlevel as ll
 
                 call_table = {'S': (ll.psgemr2d, args),
                               'D': (ll.pdgemr2d, args),
@@ -1460,8 +1452,6 @@ class DistributedMatrix(MatrixLikeAlgebra):
 
         args = [self.global_shape[1], self.global_shape[0], 1.0, self, 0.0, trans]
 
-        from . import lowlevel as ll
-
         call_table = {'S': (ll.pstran, args),
                       'D': (ll.pdtran, args),
                       'C': (ll.pctranu, args),
@@ -1511,8 +1501,6 @@ class DistributedMatrix(MatrixLikeAlgebra):
         hermi = DistributedMatrix.empty_trans(self)
 
         args = [self.global_shape[1], self.global_shape[0], 1.0, self, 0.0, hermi]
-
-        from . import lowlevel as ll
 
         call_table = {'C': (ll.pctranc, args),
                       'Z': (ll.pztranc, args)}
