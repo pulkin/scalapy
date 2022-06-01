@@ -1,129 +1,34 @@
-import numpy as np
+from common import mpi_rank, assert_mpi_env, random_distributed
 
-from mpi4py import MPI
+import numpy as np
+import pytest
 
 from scalapy import core
 import scalapy.routines as rt
 
-
-comm = MPI.COMM_WORLD
-
-rank = comm.rank
-size = comm.size
-
-if size != 4:
-    raise Exception("Test needs 4 processes.")
-
+assert_mpi_env()
 test_context = {"gridshape": (2, 2), "block_shape": (16, 16)}
 
-allclose = lambda a, b: np.allclose(a, b, rtol=1e-4, atol=1e-6)
+
+def h_conj(a):
+    """Hermitian conjugate"""
+    return a.conj().T
 
 
-def test_trans_D():
-    """Test transpose of a real double precision distributed matrix"""
+@pytest.mark.parametrize("shape,dtype,np_op,spy_op", [
+    ((354, 231), np.float64, np.transpose, rt.transpose),
+    ((379, 432), np.complex128, np.transpose, rt.transpose),
+    ((245, 357), np.float64, np.conj, rt.conj),
+    ((630, 62), np.complex128, np.conj, rt.conj),
+    ((245, 357), np.float64, h_conj, rt.hconj),
+    ((630, 62), np.complex128, h_conj, rt.hconj)
+])
+def test_trans(shape, dtype, np_op, spy_op):
+    """Test transpose of a distributed matrix"""
     with core.shape_context(**test_context):
+        a_distributed, a = random_distributed(shape, dtype)
+        at_distributed = spy_op(a_distributed)
+        at = at_distributed.to_global_array(rank=0)
 
-        m, n = 354, 231
-
-        gA = np.random.standard_normal((m, n)).astype(np.float64)
-        gA = np.asfortranarray(gA)
-
-        dA = core.DistributedMatrix.from_global_array(gA, rank=0)
-
-        dAT = rt.transpose(dA)
-        gAT = dAT.to_global_array(rank=0)
-
-        if rank == 0:
-            assert allclose(gAT, gA.T) # compare with numpy result
-
-
-def test_trans_Z():
-    """Test transpose of a complex double precision distributed matrix"""
-    with core.shape_context(**test_context):
-        m, n = 379, 432
-
-        gA = np.random.standard_normal((m, n)).astype(np.float64)
-        gA = gA + 1.0J * np.random.standard_normal((m, n)).astype(np.float64)
-        gA = np.asfortranarray(gA)
-
-        dA = core.DistributedMatrix.from_global_array(gA, rank=0)
-
-        dAT = rt.transpose(dA)
-        gAT = dAT.to_global_array(rank=0)
-
-        if rank == 0:
-            assert allclose(gAT, gA.T) # compare with numpy result
-
-
-def test_conj_D():
-    """Test complex conjugate of a real double precision distributed matrix"""
-    with core.shape_context(**test_context):
-
-        m, n = 245, 357
-
-        gA = np.random.standard_normal((m, n)).astype(np.float64)
-        gA = np.asfortranarray(gA)
-
-        dA = core.DistributedMatrix.from_global_array(gA, rank=0)
-
-        dAC = rt.conj(dA)
-        gAC = dAC.to_global_array(rank=0)
-
-        if rank == 0:
-            assert allclose(gAC, gA.conj()) # compare with numpy result
-
-
-def test_conj_Z():
-    """Test complex conjugate of a complex double precision distributed matrix"""
-    with core.shape_context(**test_context):
-
-        m, n = 630, 62
-
-        gA = np.random.standard_normal((m, n)).astype(np.float64)
-        gA = gA + 1.0J * np.random.standard_normal((m, n)).astype(np.float64)
-        gA = np.asfortranarray(gA)
-
-        dA = core.DistributedMatrix.from_global_array(gA, rank=0)
-
-        dAC = rt.conj(dA)
-        gAC = dAC.to_global_array(rank=0)
-
-        if rank == 0:
-            assert allclose(gAC, gA.conj()) # compare with numpy result
-
-
-def test_hconj_D():
-    """Test Hermitian conjugate of a real double precision distributed matrix"""
-    with core.shape_context(**test_context):
-
-        m, n = 245, 357
-
-        gA = np.random.standard_normal((m, n)).astype(np.float64)
-        gA = np.asfortranarray(gA)
-
-        dA = core.DistributedMatrix.from_global_array(gA, rank=0)
-
-        dAH = rt.hconj(dA)
-        gAH = dAH.to_global_array(rank=0)
-
-        if rank == 0:
-            assert allclose(gAH, gA.T.conj()) # compare with numpy result
-
-
-def test_hconj_Z():
-    """Test Hermitian conjugate of a complex double precision distributed matrix"""
-    with core.shape_context(**test_context):
-
-        m, n = 630, 62
-
-        gA = np.random.standard_normal((m, n)).astype(np.float64)
-        gA = gA + 1.0J * np.random.standard_normal((m, n)).astype(np.float64)
-        gA = np.asfortranarray(gA)
-
-        dA = core.DistributedMatrix.from_global_array(gA, rank=0)
-
-        dAH = rt.hconj(dA)
-        gAH = dAH.to_global_array(rank=0)
-
-        if rank == 0:
-            assert allclose(gAH, gA.T.conj()) # compare with numpy result
+        if mpi_rank == 0:
+            np.testing.assert_equal(np_op(a), at)

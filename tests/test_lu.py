@@ -1,63 +1,27 @@
+from common import mpi_rank, assert_mpi_env, random_distributed
+
 import numpy as np
 import scipy.linalg as la
-
-from mpi4py import MPI
+import pytest
 
 from scalapy import core
 import scalapy.routines as rt
 
-
-comm = MPI.COMM_WORLD
-
-rank = comm.rank
-size = comm.size
-
-if size != 4:
-    raise Exception("Test needs 4 processes.")
-
+assert_mpi_env()
 test_context = {"gridshape": (2, 2), "block_shape": (16, 16)}
 
-allclose = lambda a, b: np.allclose(a, b, rtol=1e-4, atol=1e-6)
 
-
-def test_lu_D():
-    """Test the LU factorization of a real double precision matrix"""
+@pytest.mark.parametrize("size,dtype", [
+    (357, np.float64),
+    (478, np.complex128),
+])
+def test_lu(size, dtype):
+    """Test the LU factorization of a distributed matrix"""
     with core.shape_context(**test_context):
+        a_distributed, a = random_distributed((size, size), dtype)
+        a_lu_distributed, a_pivot_distributed = rt.lu(a_distributed)
+        a_lu = a_lu_distributed.to_global_array(rank=0)
 
-        ns = 357
-
-        gA = np.random.standard_normal((ns, ns)).astype(np.float64)
-        gA = np.asfortranarray(gA)
-
-        dA = core.DistributedMatrix.from_global_array(gA, rank=0)
-
-        LU, ipiv = rt.lu(dA)
-        gLU = LU.to_global_array(rank=0)
-
-        if rank == 0:
-            P, L, U = la.lu(gA)
-            # compare with scipy result
-            assert allclose(gLU, L + U - np.eye(ns, dtype=np.float64))
-
-
-def test_lu_Z():
-    """Test the LU factorization of a complex double precision matrix"""
-    with core.shape_context(**test_context):
-
-        ns = 478
-
-        gA = np.random.standard_normal((ns, ns)).astype(np.float64)
-        gA = gA + 1.0J * np.random.standard_normal((ns, ns)).astype(np.float64)
-        gA = np.asfortranarray(gA)
-
-        dA = core.DistributedMatrix.from_global_array(gA, rank=0)
-
-        LU, ipiv = rt.lu(dA)
-        gLU = LU.to_global_array(rank=0)
-
-        # print 'Process %d has ipiv = %s' % (rank, ipiv)
-
-        if rank == 0:
-            P, L, U = la.lu(gA)
-            # compare with scipy result
-            assert allclose(gLU, L + U - np.eye(ns, dtype=np.complex128))
+        if mpi_rank == 0:
+            p, l, u = la.lu(a)
+            np.testing.assert_allclose(a_lu, l + u - np.eye(size), atol=1e-10)

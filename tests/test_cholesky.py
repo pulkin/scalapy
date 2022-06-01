@@ -1,65 +1,27 @@
-from __future__ import print_function
+from common import mpi_rank, assert_mpi_env, random_pd_distributed
+
 import numpy as np
 import scipy.linalg as la
-
-from mpi4py import MPI
+import pytest
 
 from scalapy import core
 import scalapy.routines as rt
 
-
-comm = MPI.COMM_WORLD
-
-rank = comm.rank
-size = comm.size
-
-if size != 4:
-    raise Exception("Test needs 4 processes.")
-
+assert_mpi_env()
 test_context = {"gridshape": (2, 2), "block_shape": (16, 16)}
 
-allclose = lambda a, b: np.allclose(a, b, rtol=1e-4, atol=1e-6)
 
-
-def test_cholesky_D():
-    """Test the Cholesky decomposition of a double precision matrix (use the default, upper half)"""
+@pytest.mark.parametrize("size,dtype,lower", [
+    (317, np.float64, False),
+    (342, np.complex128, True),
+])
+def test_cholesky(size, dtype, lower):
+    """Test the Cholesky decomposition"""
     with core.shape_context(**test_context):
-        ns = 317
+        a_distributed, a = random_pd_distributed((size, size), dtype)
+        u_distributed = rt.cholesky(a_distributed, lower=lower)
+        u = u_distributed.to_global_array(rank=0)
 
-        gA = np.random.standard_normal((ns, ns)).astype(np.float64)
-        gA = np.dot(gA, gA.T)  # Make positive definite
-        gA = np.asfortranarray(gA)
-
-        dA = core.DistributedMatrix.from_global_array(gA, rank=0)
-
-        dU = rt.cholesky(dA)
-        gUd = dU.to_global_array(rank=0)
-
-        if rank == 0:
-            gUn = la.cholesky(gA)
-
-            print(gUn)
-            print(gUd)
-            assert allclose(gUn, gUd)
-
-
-def test_eigh_Z():
-    """Test the Cholesky decomposition of a double precision complex matrix (use the non-default, lower half)"""
-    with core.shape_context(**test_context):
-
-        ns = 342
-
-        gA = np.random.standard_normal((ns, ns)).astype(np.float64)
-        gA = gA + 1.0J * np.random.standard_normal((ns, ns)).astype(np.float64)
-        gA = np.dot(gA, gA.T.conj())  # Make positive definite
-        gA = np.asfortranarray(gA)
-
-        dA = core.DistributedMatrix.from_global_array(gA, rank=0)
-
-        dU = rt.cholesky(dA, lower=True)
-        gUd = dU.to_global_array(rank=0)
-
-        if rank == 0:
-            gUn = la.cholesky(gA, lower=True)
-
-            assert allclose(gUn, gUd)
+        if mpi_rank == 0:
+            ref = la.cholesky(a, lower=lower)
+            np.testing.assert_allclose(u, ref, rtol=1e-4, atol=1e-6)

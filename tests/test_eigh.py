@@ -1,20 +1,12 @@
+from common import mpi_rank, assert_mpi_env, random_hermitian_distributed, random_hp_distributed
+
 import numpy as np
 import pytest
-from mpi4py import MPI
 
 from scalapy import core
 import scalapy.routines as rt
-from common import random_hermitian_distributed, random_hp_distributed
 
-
-comm = MPI.COMM_WORLD
-
-rank = comm.rank
-size = comm.size
-
-if size != 4:
-    raise Exception("Test needs 4 processes.")
-
+assert_mpi_env()
 test_context = {"gridshape": (2, 2), "block_shape": (3, 3)}
 multiple_shape_parameters = pytest.mark.parametrize("size,dtype,atol", [
     (269, np.float32, 1e-3),
@@ -33,7 +25,7 @@ def test_eigh(size, dtype, atol):
         vals, vecs_distributed = rt.eigh(a_distributed)
         vecs = vecs_distributed.to_global_array(rank=0)
 
-        if rank == 0:
+        if mpi_rank == 0:
             np.testing.assert_allclose(a @ vecs - vecs * vals[None, :], 0, err_msg=f"A @ v - val v = 0", atol=atol)
             np.testing.assert_allclose(vecs.conj().T @ vecs, np.eye(size), err_msg=f"v.T @ v = I", atol=atol)
 
@@ -48,8 +40,9 @@ def test_eigh_generalized(size, dtype, atol):
         vals, vecs_distributed = rt.eigh(a_distributed, b_distributed)
         vecs = vecs_distributed.to_global_array(rank=0)
 
-        if rank == 0:
-            np.testing.assert_allclose(a @ vecs - b @ vecs * vals[None, :], 0, err_msg=f"A @ v - val B @ v = 0", atol=atol)
+        if mpi_rank == 0:
+            np.testing.assert_allclose(a @ vecs - b @ vecs * vals[None, :], 0, err_msg=f"A @ v - val B @ v = 0",
+                                       atol=atol)
             np.testing.assert_allclose(vecs.conj().T @ b @ vecs, np.eye(size), err_msg=f"v.T @ b @ v = I", atol=atol)
 
 

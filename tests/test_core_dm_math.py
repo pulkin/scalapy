@@ -1,22 +1,13 @@
-from operator import add, sub, mul, truediv
+from common import mpi_rank, mpi_comm, assert_mpi_env, random_distributed, random
 
 import numpy as np
 import pytest
-from mpi4py import MPI
+
+from operator import add, sub, mul, truediv
 
 from scalapy import core
 
-from common import random_distributed
-
-
-comm = MPI.COMM_WORLD
-
-rank = comm.rank
-size = comm.size
-
-if size != 4:
-    raise Exception("Test needs 4 processes.")
-
+assert_mpi_env()
 test_context = {"gridshape": (2, 2), "block_shape": (3, 3)}
 multiple_shape_parameters = pytest.mark.parametrize("shape,dtype", [
     ((4, 13), np.float32),
@@ -39,7 +30,7 @@ def test_dm_dm(shape, dtype, op):
         ab = ab_distributed.to_global_array(rank=0)
         a_ = a_distributed.to_global_array(rank=0)
         b_ = b_distributed.to_global_array(rank=0)
-        if rank == 0:
+        if mpi_rank == 0:
             np.testing.assert_equal(a, a_, err_msg="a changed")
             np.testing.assert_equal(b, b_, err_msg="b changed")
             np.testing.assert_equal(op(a, b), ab, err_msg="op(a, b)")
@@ -60,7 +51,7 @@ def test_dm_scalar(shape, dtype, op):
         a_alpha_distributed = op(a_distributed, scalar)
         a_alpha = a_alpha_distributed.to_global_array(rank=0)
         a_ = a_distributed.to_global_array(rank=0)
-        if rank == 0:
+        if mpi_rank == 0:
             np.testing.assert_equal(a, a_, err_msg="a changed")
             np.testing.assert_equal(op(a, scalar), a_alpha, err_msg="op(a, scalar)")
 
@@ -68,7 +59,7 @@ def test_dm_scalar(shape, dtype, op):
         a_alpha_distributed = op(scalar, a_distributed)
         a_alpha = a_alpha_distributed.to_global_array(rank=0)
         a_ = a_distributed.to_global_array(rank=0)
-        if rank == 0:
+        if mpi_rank == 0:
             np.testing.assert_equal(a, a_, err_msg="a changed")
             np.testing.assert_equal(op(scalar, a), a_alpha, err_msg="op(scalar, a)")
 
@@ -78,18 +69,18 @@ def test_dm_np(shape, dtype):
     """ij,j->ij multiplication"""
     with core.shape_context(**test_context):
         a_distributed, a = random_distributed(shape, dtype)
-        v = np.random.standard_normal(shape[1]).astype(dtype)
-        comm.Bcast(v, root=0)
+        v = random(shape[1], dtype)
+        mpi_comm.Bcast(v, root=0)
 
         av_distributed = a_distributed * v
         av = av_distributed.to_global_array(rank=0)
         a_ = a_distributed.to_global_array(rank=0)
-        if rank == 0:
+        if mpi_rank == 0:
             np.testing.assert_equal(a, a_, err_msg="a changed")
             np.testing.assert_equal(a * v[None, :], av, err_msg="a*v")
 
-        vx = np.random.standard_normal(shape[1] + 1).astype(dtype)
-        comm.Bcast(vx, root=0)
+        vx = random(shape[1] + 1, dtype)
+        mpi_comm.Bcast(vx, root=0)
         with pytest.raises(ValueError):
             a_distributed * vx
 
@@ -117,7 +108,7 @@ def test_neg(shape, dtype):
         n_distributed = - a_distributed
         n = n_distributed.to_global_array(rank=0)
 
-        if rank == 0:
+        if mpi_rank == 0:
             np.testing.assert_equal(n, -a)
 
 
@@ -137,7 +128,7 @@ def test_dot(shape, dtype):
         core.dot_mat_mat(a_distributed, b_distributed, alpha=alpha, beta=beta, out=c_distributed)
         result = c_distributed.to_global_array(rank=0)
 
-        if rank == 0:
+        if mpi_rank == 0:
             np.testing.assert_allclose(alpha * a @ b + beta * c, result,
                                        atol=1e-5 if dtype in (np.float32, np.complex64) else 1e-12)
 
@@ -155,5 +146,5 @@ def test_dot_2(shape, dtype):
 
         ab = ab_distributed.to_global_array(rank=0)
 
-        if rank == 0:
+        if mpi_rank == 0:
             np.testing.assert_allclose(a @ b, ab, atol=1e-5 if dtype in (np.float32, np.complex64) else 1e-12)

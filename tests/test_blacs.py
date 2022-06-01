@@ -1,28 +1,18 @@
+from common import mpi_comm, mpi_rank, assert_mpi_env
 
-from mpi4py import MPI
-
-comm = MPI.COMM_WORLD
-rank = comm.rank
-size = comm.size
-
-if size != 4:
-    raise Exception("Test needs 4 processes.")
-
-
-def test_blacs_import():
-    from scalapy import blacs
+assert_mpi_env()
 
 
 def test_blacs():
     from scalapy import blacs
 
-    ctxt = blacs.sys2blacs_handle(comm)
+    ctxt = blacs.sys2blacs_handle(mpi_comm)
     blacs.gridinit(ctxt, 2, 2)
-    ranklist = [(0, 0), (0, 1), (1, 0), (1, 1)]
+    rank_list = [(0, 0), (0, 1), (1, 0), (1, 1)]
 
-    gi = blacs.gridinfo(ctxt)
-    gshape = gi[:2]
-    gpos = gi[2:]
+    grid_info = blacs.gridinfo(ctxt)
+    grid_shape = grid_info[:2]
+    grid_pos = grid_info[2:]
 
-    assert gshape == (2, 2)
-    assert gpos == ranklist[rank]
+    assert grid_shape == (2, 2)
+    assert grid_pos == rank_list[mpi_rank]

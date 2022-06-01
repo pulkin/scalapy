@@ -1,96 +1,33 @@
+from common import mpi_rank, assert_mpi_env, random_lr_distributed
+
 import numpy as np
 import scipy.linalg as la
-
-from mpi4py import MPI
+import pytest
 
 from scalapy import core
 import scalapy.routines as rt
 
 
-comm = MPI.COMM_WORLD
-
-rank = comm.rank
-size = comm.size
-
-if size != 4:
-    raise Exception("Test needs 4 processes.")
-
+assert_mpi_env()
 # TODO: tests fail with the default context
 test_context = {"gridshape": (2, 2), "block_shape": (3, 3)}
 
-allclose = lambda a, b: np.allclose(a, b, rtol=1e-4, atol=1e-6)
 
-
-def test_pinv_D():
+@pytest.mark.parametrize("shape,dtype,rank,pinv", [
+    ((9, 23), np.float64, 9, rt.pinv),
+    ((7, 9), np.complex128, 7, rt.pinv),
+    ((9, 23), np.float64, 9, rt.pinv2),
+    ((7, 9), np.complex128, 7, rt.pinv2),
+    ((17, 14), np.complex128, 4, rt.pinv2),
+])
+def test_pinv(shape, dtype, rank, pinv):
     """Test pseudo-inverse computation of a real double precision distributed matrix"""
     with core.shape_context(**test_context):
+        a_distributed, a = random_lr_distributed(shape, dtype, rank=rank)
+        a_pinv_distributed = pinv(a_distributed)
+        a_pinv = a_pinv_distributed.to_global_array()[:shape[1]]
 
-        m, n = 9, 23
-
-        gA = np.random.standard_normal((m, n)).astype(np.float64)
-        gA = np.asfortranarray(gA)
-
-        dA = core.DistributedMatrix.from_global_array(gA, rank=0)
-
-        pinvA = rt.pinv(dA)
-        gpinvA = pinvA.to_global_array()
-        gpinvA = gpinvA[:n, :]
-
-        if rank == 0:
-            assert allclose(gA, np.dot(gA, np.dot(gpinvA, gA)))
-            assert allclose(gpinvA, np.dot(gpinvA, np.dot(gA, gpinvA)))
-            assert allclose(gpinvA, la.pinv(gA)) # compare with scipy result
-            if m == n:
-                assert allclose(gpinvA, la.inv(gA)) # compare with scipy result
-
-
-def test_pinv_Z():
-    """Test pseudo-inverse computation of a complex double precision distributed matrix"""
-    with core.shape_context(**test_context):
-
-        m, n = 7, 9
-
-        gA = np.random.standard_normal((m, n)).astype(np.float64)
-        gA = gA + 1.0J * np.random.standard_normal((m, n)).astype(np.float64)
-        gA = np.asfortranarray(gA)
-
-        dA = core.DistributedMatrix.from_global_array(gA, rank=0)
-
-        pinvA = rt.pinv(dA)
-        gpinvA = pinvA.to_global_array()
-        gpinvA = gpinvA[:n, :]
-
-        if rank == 0:
-            assert allclose(gA, np.dot(gA, np.dot(gpinvA, gA)))
-            assert allclose(gpinvA, np.dot(gpinvA, np.dot(gA, gpinvA)))
-            assert allclose(gpinvA, la.pinv(gA)) # compare with scipy result
-            if m == n:
-                assert allclose(gpinvA, la.inv(gA)) # compare with scipy result
-
-
-def test_pinv_Z_alt():
-    """Test pseudo-inverse computation of a complex double precision distributed matrix"""
-    with core.shape_context(**test_context):
-        m, n = 7, 4
-
-        gA = np.random.standard_normal((m, n)).astype(np.float64)
-        gA = gA + 1.0J * np.random.standard_normal((m, n)).astype(np.float64)
-        gA = np.dot(gA, gA.T.conj())
-        assert np.linalg.matrix_rank(gA) < gA.shape[0] # no full rank
-        gA = np.asfortranarray(gA)
-
-        m, n = gA.shape
-
-        dA = core.DistributedMatrix.from_global_array(gA, rank=0)
-
-        pinvA = rt.pinv(dA)
-        gpinvA = pinvA.to_global_array()
-        gpinvA = gpinvA[:n, :]
-
-        if rank == 0:
-            assert not allclose(gA, np.dot(gA, np.dot(gpinvA, gA)))
-            assert not allclose(gpinvA, np.dot(gpinvA, np.dot(gA, gpinvA)))
-            spinvA = la.pinv(gA)
-            assert allclose(gA, np.dot(gA, np.dot(spinvA, gA)))
-            assert allclose(spinvA, np.dot(spinvA, np.dot(gA, spinvA)))
-            assert not allclose(gpinvA, la.pinv(gA)) # compare with scipy result
+        if mpi_rank == 0:
+            np.testing.assert_allclose(a, a @ a_pinv @ a, err_msg="a = a @ p @ a", atol=1e-10)
+            np.testing.assert_allclose(a_pinv, a_pinv @ a @ a_pinv, err_msg="p = p @ a @ p", atol=1e-10)
+            np.testing.assert_allclose(a_pinv, la.pinv(a))

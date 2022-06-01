@@ -1,18 +1,10 @@
-from __future__ import print_function
-import numpy as np
+from common import mpi_rank, assert_mpi_env
 
-from mpi4py import MPI
+import numpy as np
 
 from scalapy import core
 
-comm = MPI.COMM_WORLD
-
-rank = comm.rank
-size = comm.size
-
-if size != 4:
-    raise Exception("Test needs 4 processes.")
-
+assert_mpi_env()
 test_context = {"gridshape": (2, 2), "block_shape": (3, 3)}
 
 shape = (5, 5)
@@ -24,7 +16,7 @@ fname2 = 'IO_test_tmpfile_write.dat'
 
 
 def setup_module():
-    if rank == 0:
+    if mpi_rank == 0:
         farr.tofile(fname)
 
 
@@ -37,15 +29,13 @@ def test_basic_io():
 
         dm_read.to_file(fname2)
 
-        if rank == 0:
+        if mpi_rank == 0:
             farr2 = np.fromfile(fname2, dtype=np.float64)
-            print(farr2)
-            print(farr)
             assert (farr == farr2).all()
 
 
 def teardown_module():
-    if rank == 0:
+    if mpi_rank == 0:
         import os
         os.remove(fname)
         os.remove(fname2)

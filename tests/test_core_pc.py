@@ -1,29 +1,22 @@
+from common import mpi_rank, mpi_comm, assert_mpi_env
 
-from mpi4py import MPI
 from scalapy import core
 
-comm = MPI.COMM_WORLD
-
-rank = comm.rank
-size = comm.size
-
-poslist = [(0, 0), (0, 1), (1, 0), (1, 1)]
-
-if size != 4:
-    raise Exception("Test needs 4 processes.")
+assert_mpi_env()
+pos_list = [(0, 0), (0, 1), (1, 0), (1, 1)]
 
 
 def test_process_context():
-    pc = core.ProcessContext([2, 2], comm=comm)
+    pc = core.ProcessContext([2, 2], comm=mpi_comm)
 
     # Test grid shape is correct
     assert pc.grid_shape == (2, 2)
 
     # Test we have the correct positions
-    assert pc.grid_position == poslist[rank]
+    assert pc.grid_position == pos_list[mpi_rank]
 
     # Test the MPI communicator is correct
-    assert comm == pc.mpi_comm
+    assert mpi_comm is pc.mpi_comm
 
 
 def test_initmpi():
@@ -33,7 +26,7 @@ def test_initmpi():
         assert core._context.grid_shape == (2, 2)
 
         # Test we have the correct positions
-        assert core._context.grid_position == poslist[rank]
+        assert core._context.grid_position == pos_list[mpi_rank]
 
-        # Test the blockshape is set correctly
+        # Test the block shape is set correctly
         assert core._block_shape == (5, 5)
