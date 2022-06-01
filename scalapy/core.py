@@ -1343,6 +1343,19 @@ class DistributedMatrix(MatrixLikeAlgebra):
 
         return a
 
+    def is_tiny(self):
+        """True if some MPI processes may contain empty blocks"""
+        shape = np.array(self.local_shape, dtype=int)
+        out = np.empty_like(shape)
+        self.context.mpi_comm.Allreduce(shape, out, op=MPI.MIN)
+        return np.any(out == 0)
+
+    def assert_not_tiny(self, intro="DistributedMatrix"):
+        """Checks if this matrix does not contain empty blocks on any of the processes"""
+        if self.is_tiny():
+            raise ValueError(f"{intro}: the matrix with shape {self.global_shape} "
+                             f"contains empty blocks; block_shape={self.block_shape} "
+                             f"mpi_grid_shape={self.context.grid_shape}")
 
     @classmethod
     def from_file(cls, filename, global_shape, dtype, block_shape=None, context=None, order='F', displacement=0):
@@ -1575,6 +1588,10 @@ def dot_mat_mat(a, b, trans_a='N', trans_b='N', alpha=1., beta=0., out=None):
     if l != k:
         raise ScalapyException(f"dimension mismatch a.shape={a.global_shape} trans_a={trans_a} and "
                                f"b.shape={b.global_shape} trans_b={trans_b}")
+
+    # TODO: fix small matrices?
+    a.assert_not_tiny("A")
+    b.assert_not_tiny("B")
 
     if out is not None:
         a.assert_same_distribution(out)
