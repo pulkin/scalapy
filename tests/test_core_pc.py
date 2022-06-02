@@ -2,7 +2,7 @@ from common import mpi_rank, mpi_comm, assert_mpi_env
 
 from scalapy import core
 
-assert_mpi_env()
+assert_mpi_env(size=4)
 pos_list = [(0, 0), (0, 1), (1, 0), (1, 1)]
 
 

@@ -1,6 +1,6 @@
 from common import mpi_comm, mpi_rank, assert_mpi_env
 
-assert_mpi_env()
+assert_mpi_env(size=4)
 
 
 def test_blacs():

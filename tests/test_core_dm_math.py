@@ -7,7 +7,7 @@ from operator import add, sub, mul, truediv
 
 from scalapy import core
 
-assert_mpi_env()
+assert_mpi_env(size=4)
 test_context = {"gridshape": (2, 2), "block_shape": (3, 3)}
 multiple_shape_parameters = pytest.mark.parametrize("shape,dtype", [
     ((4, 13), np.float32),

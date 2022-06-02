@@ -12,7 +12,7 @@ mpi_rank = mpi_comm.rank
 mpi_size = mpi_comm.size
 
 
-def assert_mpi_env(size=4):
+def assert_mpi_env(size):
     """
     Asserts MPI environment size.
 
