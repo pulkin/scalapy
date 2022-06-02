@@ -1,6 +1,6 @@
 import pytest
 
-from common import mpi_rank, assert_mpi_env, random_distributed
+from common import assert_mpi_env, random_distributed
 
 import numpy as np
 
@@ -21,11 +21,10 @@ def test_qr(shape, dtype):
     with core.shape_context(**test_context):
         a_distributed, a = random_distributed(shape, dtype)
         q_distributed, r_distributed = rt.qr(a_distributed)
-        q = q_distributed.to_global_array(rank=0)
-        r = r_distributed.to_global_array(rank=0)
+        q = q_distributed.to_global_array()
+        r = r_distributed.to_global_array()
 
-        if mpi_rank == 0:
-            _q, _r = np.linalg.qr(a)
-            np.testing.assert_allclose(q.conj().T @ q, np.eye(q.shape[1]), err_msg="orthonormal", atol=1e-14)
-            np.testing.assert_allclose(r, np.triu(r), err_msg="upper-triangular")
-            np.testing.assert_allclose(q @ r, a, err_msg="Q @ R = A")
+        _q, _r = np.linalg.qr(a)
+        np.testing.assert_allclose(q.conj().T @ q, np.eye(q.shape[1]), err_msg="orthonormal", atol=1e-14)
+        np.testing.assert_allclose(r, np.triu(r), err_msg="upper-triangular")
+        np.testing.assert_allclose(q @ r, a, err_msg="Q @ R = A")

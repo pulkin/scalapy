@@ -1,4 +1,4 @@
-from common import mpi_rank, assert_mpi_env, random_pd_distributed
+from common import assert_mpi_env, random_pd_distributed
 
 import numpy as np
 import scipy.linalg as la
@@ -20,8 +20,7 @@ def test_cholesky(size, dtype, lower):
     with core.shape_context(**test_context):
         a_distributed, a = random_pd_distributed((size, size), dtype)
         u_distributed = rt.cholesky(a_distributed, lower=lower)
-        u = u_distributed.to_global_array(rank=0)
+        u = u_distributed.to_global_array()
 
-        if mpi_rank == 0:
-            ref = la.cholesky(a, lower=lower)
-            np.testing.assert_allclose(u, ref, rtol=1e-4, atol=1e-6)
+        ref = la.cholesky(a, lower=lower)
+        np.testing.assert_allclose(u, ref, rtol=1e-4, atol=1e-6)

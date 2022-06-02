@@ -1,4 +1,4 @@
-from common import mpi_rank, assert_mpi_env, random_distributed
+from common import assert_mpi_env, random_distributed
 
 import numpy as np
 import scipy.linalg as la
@@ -20,8 +20,7 @@ def test_inv(size, dtype):
     with core.shape_context(**test_context):
         a_distributed, a = random_distributed((size, size), dtype)
         a_inv_distributed = rt.inv(a_distributed)
-        a_inv = a_inv_distributed.to_global_array(rank=0)
+        a_inv = a_inv_distributed.to_global_array()
 
-        if mpi_rank == 0:
-            np.testing.assert_allclose(a_inv @ a, np.eye(size), err_msg="a_inv @ a = I", atol=1e-10)
-            np.testing.assert_allclose(a_inv, la.inv(a), err_msg="a_inv_spy = a_inv_npy", atol=1e-10)
+        np.testing.assert_allclose(a_inv @ a, np.eye(size), err_msg="a_inv @ a = I", atol=1e-10)
+        np.testing.assert_allclose(a_inv, la.inv(a), err_msg="a_inv_spy = a_inv_npy", atol=1e-10)

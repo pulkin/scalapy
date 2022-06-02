@@ -1,4 +1,4 @@
-from common import mpi_rank, assert_mpi_env, random_hermitian_distributed, random_hp_distributed
+from common import assert_mpi_env, random_hermitian_distributed, random_hp_distributed
 
 import numpy as np
 import pytest
@@ -23,11 +23,10 @@ def test_eigh(size, dtype, atol):
         a_distributed, a = random_hermitian_distributed((size, size), dtype)
 
         vals, vecs_distributed = rt.eigh(a_distributed)
-        vecs = vecs_distributed.to_global_array(rank=0)
+        vecs = vecs_distributed.to_global_array()
 
-        if mpi_rank == 0:
-            np.testing.assert_allclose(a @ vecs - vecs * vals[None, :], 0, err_msg=f"A @ v - val v = 0", atol=atol)
-            np.testing.assert_allclose(vecs.conj().T @ vecs, np.eye(size), err_msg=f"v.T @ v = I", atol=atol)
+        np.testing.assert_allclose(a @ vecs - vecs * vals[None, :], 0, err_msg=f"A @ v - val v = 0", atol=atol)
+        np.testing.assert_allclose(vecs.conj().T @ vecs, np.eye(size), err_msg=f"v.T @ v = I", atol=atol)
 
 
 @multiple_shape_parameters
@@ -38,12 +37,10 @@ def test_eigh_generalized(size, dtype, atol):
         b_distributed, b = random_hp_distributed((size, size), dtype)
 
         vals, vecs_distributed = rt.eigh(a_distributed, b_distributed)
-        vecs = vecs_distributed.to_global_array(rank=0)
+        vecs = vecs_distributed.to_global_array()
 
-        if mpi_rank == 0:
-            np.testing.assert_allclose(a @ vecs - b @ vecs * vals[None, :], 0, err_msg=f"A @ v - val B @ v = 0",
-                                       atol=atol)
-            np.testing.assert_allclose(vecs.conj().T @ b @ vecs, np.eye(size), err_msg=f"v.T @ b @ v = I", atol=atol)
+        np.testing.assert_allclose(a @ vecs - b @ vecs * vals[None, :], 0, err_msg=f"A @ v - val B @ v = 0", atol=atol)
+        np.testing.assert_allclose(vecs.conj().T @ b @ vecs, np.eye(size), err_msg=f"v.T @ b @ v = I", atol=atol)
 
 
 def test_eigh_generalized_fail():

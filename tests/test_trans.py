@@ -1,4 +1,4 @@
-from common import mpi_rank, assert_mpi_env, random_distributed
+from common import assert_mpi_env, random_distributed
 
 import numpy as np
 import pytest
@@ -28,7 +28,6 @@ def test_trans(shape, dtype, np_op, spy_op):
     with core.shape_context(**test_context):
         a_distributed, a = random_distributed(shape, dtype)
         at_distributed = spy_op(a_distributed)
-        at = at_distributed.to_global_array(rank=0)
+        at = at_distributed.to_global_array()
 
-        if mpi_rank == 0:
-            np.testing.assert_equal(np_op(a), at)
+        np.testing.assert_equal(np_op(a), at)

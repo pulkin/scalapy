@@ -1,4 +1,4 @@
-from common import mpi_rank, assert_mpi_env, random_distributed
+from common import assert_mpi_env, random_distributed
 
 import numpy as np
 import pytest
@@ -22,7 +22,6 @@ def test_copy_d(shape, dtype, spy_copy, npy_copy):
 
         a_distributed, a = random_distributed(shape, dtype)
         b_distributed = spy_copy(a_distributed)
-        b = b_distributed.to_global_array(rank=0)
+        b = b_distributed.to_global_array()
 
-        if mpi_rank == 0:
-            np.testing.assert_equal(npy_copy(a), b)
+        np.testing.assert_equal(npy_copy(a), b)

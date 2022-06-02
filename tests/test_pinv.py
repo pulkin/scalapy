@@ -1,4 +1,4 @@
-from common import mpi_rank, assert_mpi_env, random_lr_distributed
+from common import assert_mpi_env, random_lr_distributed
 
 import numpy as np
 import scipy.linalg as la
@@ -27,7 +27,6 @@ def test_pinv(shape, dtype, rank, pinv):
         a_pinv_distributed = pinv(a_distributed)
         a_pinv = a_pinv_distributed.to_global_array()[:shape[1]]
 
-        if mpi_rank == 0:
-            np.testing.assert_allclose(a, a @ a_pinv @ a, err_msg="a = a @ p @ a", atol=1e-10)
-            np.testing.assert_allclose(a_pinv, a_pinv @ a @ a_pinv, err_msg="p = p @ a @ p", atol=1e-10)
-            np.testing.assert_allclose(a_pinv, la.pinv(a))
+        np.testing.assert_allclose(a, a @ a_pinv @ a, err_msg="a = a @ p @ a", atol=1e-10)
+        np.testing.assert_allclose(a_pinv, a_pinv @ a @ a_pinv, err_msg="p = p @ a @ p", atol=1e-10)
+        np.testing.assert_allclose(a_pinv, la.pinv(a))
