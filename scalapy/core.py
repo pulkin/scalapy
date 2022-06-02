@@ -926,16 +926,28 @@ class DistributedMatrix(MatrixLikeAlgebra):
                 raise ValueError(f"operands have different shapes: {self.global_shape}, {x.global_shape}")
             self.assert_same_distribution(x)
             op_result = np_op(self.local_array, x.local_array)
-            if not op_inplace:
-                self.local_array[:] = op_result
 
         elif isinstance(x, Number):
             op_result = np_op(self.local_array, x)
-            if not op_inplace:
-                self.local_array[:] = op_result
+
+        elif isinstance(x, np.ndarray):
+            if x.ndim != 2:
+                raise ValueError(f"the numpy operand is not a matrix: v.shape={x.shape}")
+            nr, nc = self.global_shape
+            if x.shape == (nr, nc):
+                op_result = np_op(self.local_array, x[self.row_indices(), :][:, self.col_indices()])
+            elif x.shape == (nr, 1):
+                op_result = np_op(self.local_array, x[self.row_indices(), :])
+            elif x.shape == (1, nc):
+                op_result = np_op(self.local_array, x[:, self.col_indices()])
+            else:
+                raise ValueError(f"operands have incompatible shapes: {self.global_shape}, {x.shape}")
 
         else:
-            raise NotImplementedError(f"cannot add {x}")
+            raise NotImplementedError(f"cannot perform '{np_op}' on {self} and {x}")
+
+        if not op_inplace:
+            self.local_array[:] = op_result
 
     def __neg__(self):
         result = self.copy()
@@ -946,14 +958,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         self.__iadd__(other, np_op=np.ndarray.__isub__)
 
     def __imul__(self, x):
-        if isinstance(x, np.ndarray):  # TODO: this does not belong to here
-            if x.ndim != 1 or x.size != self.global_shape[1]:
-                raise ValueError("scalapy.DistributedMatrix.__mul__: incompatible shapes")
-            for (i, col) in enumerate(self.col_indices()):
-                self.local_array[:, i] *= x[col]
-
-        else:
-            self.__iadd__(x, np_op=np.ndarray.__imul__)
+        self.__iadd__(x, np_op=np.ndarray.__imul__)
 
     def __itruediv__(self, other):
         self.__iadd__(other, np_op=np.ndarray.__itruediv__)

@@ -623,7 +623,7 @@ def pinv2(A, overwrite_a=True, cond=None, rcond=None, return_rank=False, check_f
     rank = np.sum(s > cond * np.max(s))
     psigma_diag = 1.0 / s[: rank]
 
-    B = dot(U[:, :rank] * psigma_diag, VH[:rank]).H
+    B = dot(U[:, :rank] * psigma_diag[None, :], VH[:rank]).H
 
     if return_rank:
         return B, rank

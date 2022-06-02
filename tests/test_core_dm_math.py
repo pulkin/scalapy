@@ -65,24 +65,25 @@ def test_dm_scalar(shape, dtype, op):
 
 
 @multiple_shape_parameters
-def test_dm_np(shape, dtype):
-    """ij,j->ij multiplication"""
+@multiple_operators
+def test_dm_np(shape, dtype, op):
+    """Test operators on a distributed matrix and a numpy matrix"""
     with core.shape_context(**test_context):
         a_distributed, a = random_distributed(shape, dtype)
-        v = random(shape[1], dtype)
-        mpi_comm.Bcast(v, root=0)
+        b = random(shape, dtype)
+        mpi_comm.Bcast(b, root=0)
 
-        av_distributed = a_distributed * v
-        av = av_distributed.to_global_array()
+        ab_distributed = op(a_distributed, b)
+        ab = ab_distributed.to_global_array()
         a_ = a_distributed.to_global_array()
 
         np.testing.assert_equal(a, a_, err_msg="a changed")
-        np.testing.assert_equal(a * v[None, :], av, err_msg="a*v")
+        np.testing.assert_equal(op(a, b), ab, err_msg="a*b")
 
-        vx = random(shape[1] + 1, dtype)
-        mpi_comm.Bcast(vx, root=0)
+        bx = random((shape[0], shape[1] + 1), dtype)
+        mpi_comm.Bcast(bx, root=0)
         with pytest.raises(ValueError):
-            a_distributed * vx
+            a_distributed * bx
 
 
 @multiple_operators
