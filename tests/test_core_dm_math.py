@@ -52,16 +52,16 @@ def test_dm_scalar(shape, dtype, op):
         a_alpha = a_alpha_distributed.to_global_array()
         a_ = a_distributed.to_global_array()
 
-        np.testing.assert_equal(a, a_, err_msg="a changed")
-        np.testing.assert_equal(op(a, scalar), a_alpha, err_msg="op(a, scalar)")
+        np.testing.assert_equal(a, a_, err_msg="dm changed")
+        np.testing.assert_equal(op(a, scalar), a_alpha, err_msg="op(dm, scalar)")
 
         # reverse with a scalar
         a_alpha_distributed = op(scalar, a_distributed)
         a_alpha = a_alpha_distributed.to_global_array()
         a_ = a_distributed.to_global_array()
 
-        np.testing.assert_equal(a, a_, err_msg="a changed")
-        np.testing.assert_equal(op(scalar, a), a_alpha, err_msg="op(scalar, a)")
+        np.testing.assert_equal(a, a_, err_msg="dm changed")
+        np.testing.assert_equal(op(scalar, a), a_alpha, err_msg="op(scalar, dm)")
 
 
 @multiple_shape_parameters
@@ -70,6 +70,8 @@ def test_dm_np(shape, dtype, op):
     """Test operators on a distributed matrix and a numpy matrix"""
     with core.shape_context(**test_context):
         a_distributed, a = random_distributed(shape, dtype)
+
+        # ij,ij->ij
         b = random(shape, dtype)
         mpi_comm.Bcast(b, root=0)
 
@@ -77,9 +79,28 @@ def test_dm_np(shape, dtype, op):
         ab = ab_distributed.to_global_array()
         a_ = a_distributed.to_global_array()
 
-        np.testing.assert_equal(a, a_, err_msg="a changed")
-        np.testing.assert_equal(op(a, b), ab, err_msg="a*b")
+        np.testing.assert_equal(a, a_, err_msg="dm changed")
+        np.testing.assert_equal(op(a, b), ab, err_msg="op(dm, np)")
 
+        # ij,j->ij
+        b = random(shape[1], dtype)
+        mpi_comm.Bcast(b, root=0)
+
+        ab_distributed = op(a_distributed, b[None, :])
+        ab = ab_distributed.to_global_array()
+
+        np.testing.assert_equal(op(a, b[None, :]), ab, err_msg="op(dm, np[None, :])")
+
+        # ij,i->ij
+        b = random(shape[0], dtype)
+        mpi_comm.Bcast(b, root=0)
+
+        ab_distributed = op(a_distributed, b[:, None])
+        ab = ab_distributed.to_global_array()
+
+        np.testing.assert_equal(op(a, b[:, None]), ab, err_msg="op(dm, np[:, None])")
+
+        # shape mismatch
         bx = random((shape[0], shape[1] + 1), dtype)
         mpi_comm.Bcast(bx, root=0)
         with pytest.raises(ValueError):
