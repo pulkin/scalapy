@@ -249,6 +249,9 @@ class ProcessContext(object):
         self._all_mpi_ranks = np.zeros(self.grid_shape, dtype=int)
         self._all_mpi_ranks[self._all_grid_positions[:,0],self._all_grid_positions[:,1]] = np.arange(self.mpi_comm.size, dtype=int)
 
+        self.mpi_comm_row = self.mpi_comm.Create_group(self.mpi_comm.group.Incl(self.all_mpi_ranks[self.grid_position[0], :]))
+        self.mpi_comm_col = self.mpi_comm.Create_group(self.mpi_comm.group.Incl(self.all_mpi_ranks[:, self.grid_position[1]]))
+
     def __eq__(self, other):
         if not isinstance(other, ProcessContext):
             return False
@@ -989,6 +992,73 @@ class DistributedMatrix(MatrixLikeAlgebra):
         else:
             raise NotImplementedError(f"cannot matmul {other}")
     __matmul__ = dot
+
+    def sum(self, axis=None):
+        """
+        Sum of matrix elements.
+
+        Parameters
+        ----------
+        axis
+            Axes to sum over.
+
+        Returns
+        -------
+        result
+            The sum of matrix elements: either along the specified axis or
+            along all axes.
+        """
+        if axis is None:
+            axis = 0, 1
+        if isinstance(axis, int):
+            axis = axis,
+        axis = set(axis)
+        if axis == {0, 1}:
+            local_sum = self.local_array.sum()
+            local_sum = np.array([local_sum], dtype=self.dtype)
+            self.context.mpi_comm.Allreduce(MPI.IN_PLACE, local_sum, MPI.SUM)
+            return local_sum[0]
+
+        elif axis == {0} or axis == {1}:
+            sum_axis = axis.pop()
+            free_axis = not sum_axis
+            rc_contexts = self.context.mpi_comm_col, self.context.mpi_comm_row
+            sum_context = rc_contexts[sum_axis]
+            distribution_context = rc_contexts[free_axis]
+
+            # Sum local blocks
+            local_sum = self.local_array.sum(axis=sum_axis)
+            sum_context.Allreduce(MPI.IN_PLACE, local_sum, MPI.SUM)
+
+            # Distribute sum results
+            result = np.empty(self.global_shape[free_axis], dtype=self.dtype)
+            chunk_dtypes = []
+            for remote_rank in range(distribution_context.size):
+                dtype = self.mpi_dtype.Create_darray(
+                    distribution_context.size,
+                    remote_rank,
+                    result.shape,
+                    [MPI.DISTRIBUTE_CYCLIC],
+                    [self.block_shape[free_axis]],
+                    [distribution_context.size],
+                    MPI.ORDER_F,
+                )
+                dtype.Commit()
+                chunk_dtypes.append(dtype)
+            send_request = distribution_context.Isend([local_sum, self.mpi_dtype], dest=0)
+            if distribution_context.rank == 0:
+                MPI.Prequest.Waitall([
+                    distribution_context.Irecv([result, dtype], source=src)
+                    for src, dtype in enumerate(chunk_dtypes)
+                ])
+            send_request.Wait()
+            distribution_context.Bcast(result, root=0)
+            for i in chunk_dtypes:
+                i.Free()
+            return result
+
+        else:
+            raise ValueError(f"unknown axis to sum over: {tuple(axis)}")
 
     def _section(self, srow=0, nrow=None, scol=0, ncol=None):
         ## return a section [srow:srow+nrow, scol:scol+ncol] of the global array as a new distributed array

@@ -70,3 +70,13 @@ def test_dm_redistribute():
         rdpc2 = dm3x3.redistribute(block_shape=[1, 1], context=pc2)
 
         np.testing.assert_equal(dmpc2.local_array, rdpc2.local_array)
+
+
+def test_sum(shape=(13, 17), dtype=np.float64):
+    """Test sum over elements"""
+    with core.shape_context(**test_context):
+        a_distributed, a = random_distributed(shape, dtype)
+
+        np.testing.assert_allclose(a_distributed.sum(0), a.sum(0))
+        np.testing.assert_allclose(a_distributed.sum(1), a.sum(1))
+        np.testing.assert_allclose(a_distributed.sum(), a.sum())
