@@ -9,9 +9,9 @@ import scalapy.routines as rt
 assert_mpi_env(size=4)
 test_context = {"gridshape": (2, 2), "block_shape": (3, 3)}
 multiple_shape_parameters = pytest.mark.parametrize("size,dtype,atol", [
-    (269, np.float32, 1e-3),
+    (269, np.float32, 2e-3),
     (270, np.float64, 1e-7),
-    (271, np.complex64, 1e-3),
+    (271, np.complex64, 2e-3),
     (272, np.complex128, 1e-7),
 ])
 

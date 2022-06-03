@@ -27,4 +27,4 @@ def test_qr(shape, dtype):
         _q, _r = np.linalg.qr(a)
         np.testing.assert_allclose(q.conj().T @ q, np.eye(q.shape[1]), err_msg="orthonormal", atol=1e-14)
         np.testing.assert_allclose(r, np.triu(r), err_msg="upper-triangular")
-        np.testing.assert_allclose(q @ r, a, err_msg="Q @ R = A")
+        np.testing.assert_allclose(q @ r, a, err_msg="Q @ R = A", atol=1e-14)
