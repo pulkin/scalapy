@@ -989,6 +989,8 @@ class DistributedMatrix(MatrixLikeAlgebra):
         """
         if isinstance(other, DistributedMatrix):
             return dot_mat_mat(self, other)
+        elif isinstance(other, np.ndarray):
+            return dot_mat_vec(self, other)
         else:
             raise NotImplementedError(f"cannot matmul {other}")
     __matmul__ = dot
@@ -1686,3 +1688,37 @@ def dot_mat_mat(a, b, trans_a='N', trans_b='N', alpha=1., beta=0., out=None):
     func, args = call_table[a.sc_dtype]
     func(*args)
     return out
+
+
+def dot_mat_vec(a, v, left=False):
+    """
+    An matrix-vector product with a numpy array.
+
+    ij, j -> i
+
+    or
+
+    ij, i -> j
+
+    Parameters
+    ----------
+    a : DistributedMatrix
+        The matrix to multiply.
+    v : np.ndarray
+        The vector to multiply.
+    left : bool
+        If True, performs the `v @ A` product.
+        Otherwise, perform the `A @ v` product.
+
+    Returns
+    -------
+    result : np.ndarray
+        The resulting vector.
+    """
+    if v.ndim != 1:
+        raise ValueError(f"the input v is not a vector: v.shape={v.shape}")
+    # TODO: optimize memory
+    if left:
+        return (a * v[:, None]).sum(axis=0)
+    else:
+        return (a * v[None, :]).sum(axis=1)

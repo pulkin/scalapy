@@ -134,7 +134,7 @@ def test_neg(shape, dtype):
 
 
 @multiple_shape_parameters
-def test_dot(shape, dtype):
+def test_dot_raw(shape, dtype):
     """matrix-matrix multiplication (raw version): alpha * A @ B + beta * C"""
     with core.shape_context(**test_context):
         m, n = shape
@@ -154,7 +154,7 @@ def test_dot(shape, dtype):
 
 
 @multiple_shape_parameters
-def test_dot_2(shape, dtype):
+def test_dot_mat_mat(shape, dtype):
     """matrix-matrix multiplication (dot version): A @ B"""
     with core.shape_context(**test_context):
         m, n = shape
@@ -167,3 +167,15 @@ def test_dot_2(shape, dtype):
         ab = ab_distributed.to_global_array()
 
         np.testing.assert_allclose(a @ b, ab, atol=1e-5 if dtype in (np.float32, np.complex64) else 1e-12)
+
+
+@multiple_shape_parameters
+def test_dot_mat_vec(shape, dtype):
+    """matrix-vector multiplication (dot version): A @ v"""
+    with core.shape_context(**test_context):
+        a_distributed, a = random_distributed(shape, dtype)
+        v = random(shape[1], dtype)
+        mpi_comm.Bcast(v)
+        av = a_distributed @ v
+
+        np.testing.assert_allclose(a @ v, av, atol=1e-6 if dtype in (np.float32, np.complex64) else 1e-12)
