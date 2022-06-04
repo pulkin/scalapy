@@ -12,8 +12,7 @@ test_context = {"gridshape": (2, 2), "block_shape": (3, 3)}
 
 def test_save_load(shape=(5, 5), dtype=np.float64):
     with core.shape_context(**test_context):
-        from common import non_random
-        a_distributed, a = random_distributed(shape, dtype, f_random=non_random)
+        a_distributed, a = random_distributed(shape, dtype)
 
         if mpi_rank == 0:
             f_temp = NamedTemporaryFile()
