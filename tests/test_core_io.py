@@ -29,3 +29,4 @@ def test_save_load(shape=(5, 5), dtype=np.float64):
         # Test convention
         test = np.fromfile(fn_temp)
         np.testing.assert_equal(test.reshape(shape).T, a)  # TODO: fix convention?
+        mpi_comm.Barrier()  # prevent premature temporary file cleanup
