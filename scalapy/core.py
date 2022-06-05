@@ -218,10 +218,9 @@ class ProcessContext(object):
         self._grid_shape = tuple(grid_shape)
 
         # Initialise BLACS context
-        ctxt = blacs.sys2blacs_handle(self.mpi_comm)
-        self._blacs_context = blacs.gridinit(ctxt, self.grid_shape[0], self.grid_shape[1])
+        self._blacs_context = blacs.GridContext(*grid_shape, comm=self.mpi_comm)
 
-        blacs_info = blacs.gridinfo(self.blacs_context)
+        blacs_info = self._blacs_context.get_info()
         blacs_size, blacs_pos = blacs_info[:2], blacs_info[2:]
 
         # Check we got the gridsize we wanted
@@ -472,7 +471,6 @@ class DistributedMatrix(MatrixLikeAlgebra):
     def block_shape(self):
         """The blocksize for the matrix."""
         return self._block_shape
-
 
     def __init__(self, global_shape, dtype=np.float64, block_shape=None, context=None):
         r"""Initialise an empty DistributedMatrix.

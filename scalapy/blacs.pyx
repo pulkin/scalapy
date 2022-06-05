@@ -1,4 +1,3 @@
-
 from mpi4py import MPI
 
 from mpi4py cimport MPI
@@ -9,92 +8,61 @@ class BLACSException(Exception):
     pass
 
 
-def sys2blacs_handle(comm):
-    """Create a BLACS handle from an MPI Communicator.
+class BlacsContext:
+    def __init__(self, comm=None):
+        if comm is None:
+            comm = MPI.COMM_WORLD
+        self.comm = comm
+        self.handle = Csys2blacs_handle(<MPI_Comm>(<MPI.Comm>comm).ob_mpi)
 
-    Parameters
-    ----------
-    comm : MPI.Comm
+    def __int__(self):
+        return self.handle
 
-    Returns
-    -------
-    ctxt : integer
-        BLACS context handle.
-    """
-    if not isinstance(comm, MPI.Comm):
-        raise Exception("Did not recieve MPI Communicator.")
-
-    return Csys2blacs_handle(<MPI_Comm>(<MPI.Comm>comm).ob_mpi)
+    def __del__(self):
+        Cfree_blacs_system_handle(<int>self.handle)
 
 
-def gridinfo(ctxt):
-    """Fetch the process grid info.
+class GridContext:
+    def __init__(self, int n_rows, int n_cols, order="Row", blacs_context=None, comm=None):
+        if blacs_context is None:
+            blacs_context = BlacsContext(comm)
+        self.blacs_context = blacs_context
+        self.order = order
 
-    Parameters
-    ----------
-    ctxt : integer
-        BLACS context int.
+        cdef int handle = <int>blacs_context.handle
+        order = order.encode()
+        assert order == b"Row", "only row order is supported"
+        Cblacs_gridinit(&handle, order, n_rows, n_cols)
+        self.handle = handle
+        # test
+        self.get_info()
 
-    Returns
-    -------
-    nrows, ncols : integer
-        Total size of grid.
-    row, col : integer
-        Position in grid.
+    def get_info(self):
+        """
+        Fetch the process grid info.
 
-    Raises
-    ------
-    BLACSException
-        If process grid undefined.
-    """
-    cdef int ictxt, nrows, ncols, row, col
+        Returns
+        -------
+        n_rows : int
+        n_cols : int
+            Grid size.
+        row : int
+        col : int
+            Grid position.
 
-    ictxt = <int>ctxt
+        Raises
+        ------
+        BLACSException
+            If process grid undefined.
+        """
+        cdef int handle = <int>self.handle, n_rows, n_cols, row, col
+        Cblacs_gridinfo(handle, &n_rows, &n_cols, &row, &col)
+        if n_rows == -1:
+            raise BLACSException("grid context does not exist")
+        return (n_rows, n_cols, row, col)
 
-    Cblacs_gridinfo(ictxt, &nrows, &ncols, &row, &col)
+    def __int__(self):
+        return self.handle
 
-    if nrows == -1:
-        raise BLACSException("Grid not defined.")
-
-    return (nrows, ncols, row, col)
-
-
-def gridinit(ctxt, nrows, ncols, order="Row"):
-    """Initialise the BLACS process grid.
-
-    Parameters
-    ----------
-    ctxt : integer
-        BLACS context handle. Must have been initialised with
-        `sys2blacs_handle`.
-    nrows, ncols : integer
-        Process grid size.
-
-    Raises
-    ------
-    BLACSException
-        If grid initialisation failed.
-    """
-    cdef int ictxt
-
-    ictxt = <int>ctxt
-
-    # Ensure order is property converted to an ASCII string
-    order = bytes(order.encode('ascii')) if isinstance(order, str) else order
-
-    if order != b"Row":
-        raise Exception("Order not valid.")
-
-    # Initialise the grid
-    Cblacs_gridinit(&ictxt, order, nrows, ncols)
-
-    # Check that the initialisation worked
-    try:
-        gridinfo(ctxt)
-    except BLACSException:
-        raise BLACSException("Grid initialisation failed.")
-
-    # Get new context
-    ctxt = ictxt
-
-    return ctxt
+    def __del__(self):
+        Cblacs_gridexit(<int>self.handle)
