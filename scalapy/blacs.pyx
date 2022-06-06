@@ -32,17 +32,24 @@ class BlacsContext:
         except AttributeError:
             pass
 
+    def __str__(self):
+        return f"BlacsContext-{self.handle}"
+
 
 class GridContext:
-    def __init__(self, int n_rows=-1, int n_cols=-1, order="Row", blacs_context=None, comm=None):
+    def __init__(self, shape, order="Row", blacs_context=None, comm=None):
+        cdef int n_rows, n_cols
+
         if blacs_context is None:
             blacs_context = BlacsContext(comm)
         self.blacs_context = blacs_context
         self.order = order
-        if n_rows == -1 or n_cols == -1:
+        if shape is None:
             size = blacs_context.comm.size
             n_cols = int_sqrt(size)
             n_rows = size // n_cols
+        else:
+            n_rows, n_cols = shape
 
         cdef int handle = <int>blacs_context.handle
         order = order.encode()
@@ -54,7 +61,7 @@ class GridContext:
 
     def get_info(self):
         """
-        Fetch the process grid info.
+        Fetch the grid info.
 
         Returns
         -------
@@ -84,3 +91,6 @@ class GridContext:
             Cblacs_gridexit(<int>self.handle)
         except AttributeError:
             pass
+
+    def __str__(self):
+        return f"GridContext-{self.handle}"

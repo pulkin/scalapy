@@ -208,9 +208,7 @@ class ProcessContext(object):
         self._mpi_comm = comm
 
         # Initialise BLACS context
-        if grid_shape is None:
-            grid_shape = -1, -1
-        self._blacs_context = blacs.GridContext(*grid_shape, comm=self.mpi_comm)
+        self._blacs_context = blacs.GridContext(grid_shape, comm=self.mpi_comm)
 
         blacs_info = self._blacs_context.get_info()
         blacs_size, blacs_pos = blacs_info[:2], blacs_info[2:]

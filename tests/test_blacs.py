@@ -8,7 +8,7 @@ assert_mpi_env(size=4)
 
 
 def test_blacs():
-    blacs_context = blacs.GridContext(2, 2, comm=mpi_comm)
+    blacs_context = blacs.GridContext((2, 2), comm=mpi_comm)
     rank_list = [(0, 0), (0, 1), (1, 0), (1, 1)]
 
     grid_info = blacs_context.get_info()
@@ -21,8 +21,8 @@ def test_blacs():
 
 def test_blacs_cleanup():
     """Tests context cleanup"""
-    blacs_context_1 = blacs.GridContext(2, 2, comm=mpi_comm)
-    blacs_context_2 = blacs.GridContext(2, 2, comm=mpi_comm)
+    blacs_context_1 = blacs.GridContext((2, 2), comm=mpi_comm)
+    blacs_context_2 = blacs.GridContext((2, 2), comm=mpi_comm)
 
     assert blacs_context_1.handle != blacs_context_2.handle, f"handles {blacs_context_1.handle} and " \
                                                              f"{blacs_context_2.handle} are not unique"
@@ -30,7 +30,7 @@ def test_blacs_cleanup():
     handle = blacs_context_2.handle
     del blacs_context_2
     gc.collect()
-    blacs_context_3 = blacs.GridContext(2, 2, comm=mpi_comm)
+    blacs_context_3 = blacs.GridContext((2, 2), comm=mpi_comm)
 
     assert blacs_context_3.handle == handle, f"handle {handle} was not re-used: instead, {blacs_context_3.handle} " \
                                              f"was found"
