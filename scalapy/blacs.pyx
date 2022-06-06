@@ -27,7 +27,10 @@ class BlacsContext:
         return self.handle
 
     def __del__(self):
-        Cfree_blacs_system_handle(<int>self.handle)
+        try:
+            Cfree_blacs_system_handle(<int>self.handle)
+        except AttributeError:
+            pass
 
 
 class GridContext:
@@ -77,4 +80,7 @@ class GridContext:
         return self.handle
 
     def __del__(self):
-        Cblacs_gridexit(<int>self.handle)
+        try:
+            Cblacs_gridexit(<int>self.handle)
+        except AttributeError:
+            pass
