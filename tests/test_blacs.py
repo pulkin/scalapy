@@ -1,6 +1,6 @@
 from common import mpi_comm, mpi_rank, assert_mpi_env
 
-from scalapy import blacs
+from scalapy import blacs, core
 
 import gc
 
@@ -34,3 +34,11 @@ def test_blacs_cleanup():
 
     assert blacs_context_3.handle == handle, f"handle {handle} was not re-used: instead, {blacs_context_3.handle} " \
                                              f"was found"
+
+
+def test_default():
+    """Tests the default context"""
+    context = core._context
+    assert context.grid_shape == (2, 2)
+
+    core.DistributedMatrix((100, 100))

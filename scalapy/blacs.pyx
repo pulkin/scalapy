@@ -2,6 +2,14 @@ from mpi4py import MPI
 
 from mpi4py cimport MPI
 from blacs cimport *
+from libc.math cimport sqrt, ceil
+
+
+cdef int int_sqrt(int x):
+    cdef int i = <int>ceil(sqrt(x))
+    while x % i:
+        i -= 1
+    return i
 
 
 class BLACSException(Exception):
@@ -23,11 +31,15 @@ class BlacsContext:
 
 
 class GridContext:
-    def __init__(self, int n_rows, int n_cols, order="Row", blacs_context=None, comm=None):
+    def __init__(self, int n_rows=-1, int n_cols=-1, order="Row", blacs_context=None, comm=None):
         if blacs_context is None:
             blacs_context = BlacsContext(comm)
         self.blacs_context = blacs_context
         self.order = order
+        if n_rows == -1 or n_cols == -1:
+            size = blacs_context.comm.size
+            n_cols = int_sqrt(size)
+            n_rows = size // n_cols
 
         cdef int handle = <int>blacs_context.handle
         order = order.encode()

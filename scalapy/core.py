@@ -207,28 +207,16 @@ class ProcessContext(object):
 
         self._mpi_comm = comm
 
-        # Grid shape setup
-        if not _chk_2d_size(grid_shape):
-            raise ScalapyException("Grid shape invalid.")
-
-        gs = grid_shape[0]*grid_shape[1]
-        if gs != self.mpi_comm.size:
-            raise ScalapyException("Gridshape must be equal to the MPI size.")
-
-        self._grid_shape = tuple(grid_shape)
-
         # Initialise BLACS context
+        if grid_shape is None:
+            grid_shape = -1, -1
         self._blacs_context = blacs.GridContext(*grid_shape, comm=self.mpi_comm)
 
         blacs_info = self._blacs_context.get_info()
         blacs_size, blacs_pos = blacs_info[:2], blacs_info[2:]
 
-        # Check we got the gridsize we wanted
-        if blacs_size[0] != self.grid_shape[0] or blacs_size[1] != self.grid_shape[1]:
-            raise ScalapyException("BLACS did not give requested gridsize (requested %s, got %s)."
-                                   % (repr(self.grid_shape), repr(blacs_size)))
-
         # Set the grid position.
+        self._grid_shape = blacs_size
         self._grid_position = blacs_pos
 
         #
@@ -258,6 +246,9 @@ class ProcessContext(object):
 
     def __repr__(self):
         return f"ProcessContext(rank={self.mpi_comm.rank}, grid={self.grid_shape}, grid_pos={self.grid_position})"
+
+
+initmpi()
 
 
 class MatrixLikeAlgebra:
