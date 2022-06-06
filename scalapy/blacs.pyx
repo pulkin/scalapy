@@ -83,6 +83,10 @@ class GridContext:
             raise BLACSException("grid context does not exist")
         return (n_rows, n_cols, row, col)
 
+    @property
+    def comm(self):
+        return self.blacs_context.comm
+
     def __int__(self):
         return self.handle
 

@@ -168,13 +168,10 @@ class ProcessContext(object):
         """Process grid position."""
         return self._grid_position
 
-
-    _mpi_comm = None
-
     @property
     def mpi_comm(self):
         """MPI Communicator for this ProcessContext."""
-        return self._mpi_comm
+        return self.blacs_context.comm
 
 
     _blacs_context = None
@@ -201,14 +198,8 @@ class ProcessContext(object):
         """Construct a BLACS context for the current process.
         """
 
-        # MPI setup
-        if comm is None:
-            comm = MPI.COMM_WORLD
-
-        self._mpi_comm = comm
-
         # Initialise BLACS context
-        self._blacs_context = blacs.GridContext(grid_shape, comm=self.mpi_comm)
+        self._blacs_context = blacs.GridContext(grid_shape, comm=comm)
 
         blacs_info = self._blacs_context.get_info()
         blacs_size, blacs_pos = blacs_info[:2], blacs_info[2:]
