@@ -180,13 +180,13 @@ class ProcessContext(object):
     @property
     def all_grid_positions(self):
         """Returns shape (mpi_comm_size,2) array, such that (arr[i,0], arr[i,1]) gives the grid position of mpi task i."""
-        return self._all_grid_positions
+        return self.blacs_context.pos_all
 
 
     @property
     def all_mpi_ranks(self):
         """Inverse of all_grid_positions: returns 2D array such that arr[i,j] gives the mpi rank at grid position (i,j)."""
-        return self._all_mpi_ranks
+        return self.blacs_context.rank_grid
 
 
     def __init__(self, grid_shape, comm=None):
@@ -204,14 +204,6 @@ class ProcessContext(object):
         # This would have the advantage that MPI_Allgather() only gets called if needed, but the disadvantage that it
         # would hang if the first call to all_grid_positions() is from a serial context.)
         #
-        t = np.array(self.grid_position)
-        assert t.shape == (2,)
-        self._all_grid_positions = np.zeros((self.mpi_comm.size,2), dtype=t.dtype)
-        self.mpi_comm.Allgather(t, self._all_grid_positions)
-
-        # Compute all_mpi_ranks from all_grid_positions
-        self._all_mpi_ranks = np.zeros(self.grid_shape, dtype=int)
-        self._all_mpi_ranks[self._all_grid_positions[:,0],self._all_grid_positions[:,1]] = np.arange(self.mpi_comm.size, dtype=int)
 
         self.mpi_comm_row = self.mpi_comm.Create_group(self.mpi_comm.group.Incl(self.all_mpi_ranks[self.grid_position[0], :]))
         self.mpi_comm_col = self.mpi_comm.Create_group(self.mpi_comm.group.Incl(self.all_mpi_ranks[:, self.grid_position[1]]))

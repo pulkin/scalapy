@@ -1,4 +1,5 @@
 from mpi4py import MPI
+import numpy as np
 
 from mpi4py cimport MPI
 from blacs cimport *
@@ -83,6 +84,20 @@ class GridContext:
             raise BLACSException("grid context does not exist")
         return (n_rows, n_cols, row, col)
 
+    def communicate_positions(self):
+        """
+        Communicates grid positions across the MPI pool.
+
+        Returns
+        -------
+        result : ndarray
+            The resulting grid positions for each MPI rank.
+        """
+        t = np.array(self.pos)
+        result = np.empty((self.comm.size, *t.shape), dtype=t.dtype)
+        self.comm.Allgather(t, result)
+        return result
+
     @property
     def comm(self):
         """Associated MPI communicator"""
@@ -97,6 +112,19 @@ class GridContext:
     def pos(self):
         """Process grid position as a pair of integers"""
         return self.get_info()[2:]
+
+    @property
+    def pos_all(self):
+        """Grid positions for each MPI rank"""
+        return self.communicate_positions()
+
+    @property
+    def rank_grid(self):
+        """A grid with MPI ranks"""
+        pos = self.pos_all
+        result = np.full(self.shape, -1, dtype=int)
+        result[tuple(pos.T)] = np.arange(len(pos))
+        return result
 
     def __int__(self):
         return self.handle
