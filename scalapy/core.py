@@ -153,20 +153,15 @@ class ProcessContext(object):
     all_mpi_ranks
     """
 
-    _grid_shape = (1, 1)
-
     @property
     def grid_shape(self):
         """Process grid shape."""
-        return self._grid_shape
-
-
-    _grid_position = (0, 0)
+        return self.blacs_context.shape
 
     @property
     def grid_position(self):
         """Process grid position."""
-        return self._grid_position
+        return self.blacs_context.pos
 
     @property
     def mpi_comm(self):
@@ -200,13 +195,6 @@ class ProcessContext(object):
 
         # Initialise BLACS context
         self._blacs_context = blacs.GridContext(grid_shape, comm=comm)
-
-        blacs_info = self._blacs_context.get_info()
-        blacs_size, blacs_pos = blacs_info[:2], blacs_info[2:]
-
-        # Set the grid position.
-        self._grid_shape = blacs_size
-        self._grid_position = blacs_pos
 
         #
         # As far as I know, BLACS doesn't guarantee any specific association between MPI tasks and grid positions, so

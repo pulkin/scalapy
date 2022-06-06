@@ -85,7 +85,18 @@ class GridContext:
 
     @property
     def comm(self):
+        """Associated MPI communicator"""
         return self.blacs_context.comm
+
+    @property
+    def shape(self):
+        """Process grid shape as a pair of integers"""
+        return self.get_info()[:2]
+
+    @property
+    def pos(self):
+        """Process grid position as a pair of integers"""
+        return self.get_info()[2:]
 
     def __int__(self):
         return self.handle
