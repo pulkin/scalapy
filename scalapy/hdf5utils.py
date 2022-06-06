@@ -130,8 +130,8 @@ def write_matrix(a, f, dataset_name, root=0, memlimit_gb=1.0, nblocks=None):
         raise RuntimeError('write_matrix: expected either rank-2 numpy array or scalapy.core.DistributedMatrix')
 
     mpi_rank = a.context.mpi_comm.rank
-    nrows_global = a.global_shape[0]
-    ncols_global = a.global_shape[1]
+    nrows_global = a.shape[0]
+    ncols_global = a.shape[1]
 
     if nblocks is None:
         # Factor 2 here is because of double-buffering needed to unpack the result of mpi_gather (see below)

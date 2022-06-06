@@ -32,7 +32,7 @@ from .blockcyclic import numrc
 def _pxxxevr(jobz, erange, uplo, A, vl, vu, il, iu):
     # wrapper for ScaLAPACK pssyevr, pdsyevr, pcheevr, pzheevr
 
-    n = A.global_shape[0]
+    n = A.shape[0]
 
     w = np.empty(n, dtype=util.real_equiv(A.dtype))
     Z = core.DistributedMatrix.empty_like(A)
@@ -53,7 +53,7 @@ def _pxxxevr(jobz, erange, uplo, A, vl, vu, il, iu):
 def _pxxxgvx(ibtype, jobz, erange, uplo, A, B, vl, vu, il, iu, abstol=0.0, orfac=-1.0):
     # wrapper for ScaLAPACK pssygvx, pdsygvx, pchegvx, pzhegvx
 
-    N = A.global_shape[0]
+    N = A.shape[0]
 
     w = np.zeros(N, dtype=util.real_equiv(A.dtype))
     Z = core.DistributedMatrix.empty_like(A)
@@ -125,7 +125,7 @@ def eigh(A, B=None, lower=True, eigvals_only=False, overwrite_a=True, overwrite_
     task = 'N' if eigvals_only else 'V'
     erange = 'A'
     uplo = "L" if lower else "U"
-    N = A.global_shape[0]
+    N = A.shape[0]
     vl, vu = 0.0, 1.0
     il, iu = 1, 1
 
@@ -164,7 +164,7 @@ def eigh(A, B=None, lower=True, eigvals_only=False, overwrite_a=True, overwrite_
         # Check if matrix is square
         util.assert_square(B)
         A.assert_same_distribution(B)
-        assert A.global_shape == B.global_shape, 'Not the same global shape'
+        assert A.shape == B.shape, 'Not the same global shape'
 
         B = B if overwrite_b else B.copy()
 
@@ -231,7 +231,7 @@ def cholesky(A, lower=False, overwrite_a=False, zero_triangle=True):
     A = A if overwrite_a else A.copy()
 
     uplo = "L" if lower else "U"
-    N = A.global_shape[0]
+    N = A.shape[0]
 
     args = [uplo, N, A]
 
@@ -314,7 +314,7 @@ def lu(A, overwrite_a=True):
 
     A = A if overwrite_a else A.copy()
 
-    M, N = A.global_shape
+    M, N = A.shape
 
     ipiv = np.zeros((A.local_shape[0] + A.block_shape[0]), dtype='i')
 
@@ -363,7 +363,7 @@ def svd(A, overwrite_a=True, compute_u=True, compute_v=True):
 
     A = A if overwrite_a else A.copy()
 
-    m, n = A.global_shape
+    m, n = A.shape
     size = min(m, n)
     sizeb = max(m, n)
 
@@ -427,7 +427,7 @@ def inv(A, overwrite_a=True):
 
     A = A if overwrite_a else A.copy()
 
-    N, N = A.global_shape
+    N, N = A.shape
 
     # first do the LU factorization
     ipiv = np.zeros((A.local_shape[0] + A.block_shape[0]), dtype='i')
@@ -493,7 +493,7 @@ def triinv(A, lower=False, unit_triangular=False, overwrite_a=True):
 
     A = A if overwrite_a else A.copy()
 
-    N, N = A.global_shape
+    N, N = A.shape
 
     uplo = 'L' if lower else 'U'
     diag = 'U' if unit_triangular else 'N'
@@ -544,7 +544,7 @@ def pinv(A, overwrite_a=True):
 
     A = A if overwrite_a else A.copy()
 
-    M, N = A.global_shape
+    M, N = A.shape
 
     # distributed matrix which contains an identity matrix in the first M rows
     B = core.DistributedMatrix([max(M, N), M], dtype=A.dtype, block_shape=A.block_shape, context=A.context)
@@ -652,7 +652,7 @@ def qr(a, overwrite_a=True, mode='reduced'):
     """
     assert mode == 'reduced'
     a = a if overwrite_a else a.copy()
-    m, n = a.global_shape
+    m, n = a.shape
     rank = min(m, n)
 
     # Temporary local array with elementary reflections of Q representation
@@ -777,9 +777,9 @@ def copy(a, which=None, out=None):
     """
     if out is None:
         out = core.DistributedMatrix.zeros_like(a)
-    assert a.global_shape == out.global_shape, f'out shape mismatch: {out.global_shape} vs {a.global_shape} (expected)'
+    assert a.shape == out.shape, f'out shape mismatch: {out.shape} vs {a.shape} (expected)'
 
-    m, n = a.global_shape
+    m, n = a.shape
     args = [which, m, n, a, out]
 
     call_table = {'S': (ll.pslacpy, args),

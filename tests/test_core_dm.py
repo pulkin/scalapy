@@ -14,7 +14,7 @@ def test_dm_init():
         dm = core.DistributedMatrix([5, 5])
 
         # Check global shape
-        assert dm.global_shape == (5, 5)
+        assert dm.shape == (5, 5)
 
         # Check block size
         assert dm.block_shape == test_context["block_shape"]

@@ -58,7 +58,7 @@ def assert_square(A):
     Alist = flatten([A])
     for A in Alist:
 
-        gs = A.global_shape
+        gs = A.shape
         if gs[0] != gs[1]:
             raise core.ScalapyException("Matrix must be square (has dimensions %i x %i)." % (gs[0], gs[1]))
 

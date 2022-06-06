@@ -442,7 +442,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
 
 
     @property
-    def global_shape(self):
+    def shape(self):
         """The shape of the global matrix."""
         return self._global_shape
 
@@ -451,9 +451,9 @@ class DistributedMatrix(MatrixLikeAlgebra):
     def local_shape(self):
         """The shape of the local matrix."""
 
-        lshape = tuple(map(blockcyclic.numrc, self.global_shape,
-                       self.block_shape, self.context.grid_position,
-                       self.context.grid_shape))
+        lshape = tuple(map(blockcyclic.numrc, self.shape,
+                           self.block_shape, self.context.grid_position,
+                           self.context.grid_shape))
 
         return tuple(lshape)
 
@@ -518,8 +518,8 @@ class DistributedMatrix(MatrixLikeAlgebra):
 
         self._desc[0] = 1  # Dense matrix
         self._desc[1] = self.context.blacs_context
-        self._desc[2] = self.global_shape[0]
-        self._desc[3] = self.global_shape[1]
+        self._desc[2] = self.shape[0]
+        self._desc[3] = self.shape[1]
         self._desc[4] = self.block_shape[0]
         self._desc[5] = self.block_shape[1]
         self._desc[6] = 0
@@ -531,7 +531,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         ##   These are required for reading in and out of arrays and files.
 
         # Get MPI process info
-        if self.global_shape[0] == 0 or self.global_shape[1] == 0:
+        if self.shape[0] == 0 or self.shape[1] == 0:
             self._darr_f = None
             self._darr_c = None
             self._darr_list = []
@@ -541,25 +541,25 @@ class DistributedMatrix(MatrixLikeAlgebra):
 
             # Create distributed array view (F-ordered)
             self._darr_f = self.mpi_dtype.Create_darray(size, rank,
-                                self.global_shape,
-                                [MPI.DISTRIBUTE_CYCLIC, MPI.DISTRIBUTE_CYCLIC],
-                                self.block_shape, self.context.grid_shape,
-                                MPI.ORDER_F)
+                                                        self.shape,
+                                                        [MPI.DISTRIBUTE_CYCLIC, MPI.DISTRIBUTE_CYCLIC],
+                                                        self.block_shape, self.context.grid_shape,
+                                                        MPI.ORDER_F)
             self._darr_f.Commit()
 
             # Create distributed array view (F-ordered)
             self._darr_c = self.mpi_dtype.Create_darray(size, rank,
-                                self.global_shape,
-                                [MPI.DISTRIBUTE_CYCLIC, MPI.DISTRIBUTE_CYCLIC],
-                                self.block_shape, self.context.grid_shape,
-                                MPI.ORDER_C).Commit()
+                                                        self.shape,
+                                                        [MPI.DISTRIBUTE_CYCLIC, MPI.DISTRIBUTE_CYCLIC],
+                                                        self.block_shape, self.context.grid_shape,
+                                                        MPI.ORDER_C).Commit()
 
             # Create list of types for all ranks (useful for passing to global array)
             self._darr_list = [ self.mpi_dtype.Create_darray(size, ri,
-                                self.global_shape,
-                                [MPI.DISTRIBUTE_CYCLIC, MPI.DISTRIBUTE_CYCLIC],
-                                self.block_shape, self.context.grid_shape,
-                                MPI.ORDER_F).Commit() for ri in range(size) ]
+                                                             self.shape,
+                                                             [MPI.DISTRIBUTE_CYCLIC, MPI.DISTRIBUTE_CYCLIC],
+                                                             self.block_shape, self.context.grid_shape,
+                                                             MPI.ORDER_F).Commit() for ri in range(size) ]
 
 
     @classmethod
@@ -576,7 +576,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         -------
         cmat : DistributedMatrix
         """
-        return cls(mat.global_shape, block_shape=mat.block_shape,
+        return cls(mat.shape, block_shape=mat.block_shape,
                    dtype=mat.dtype, context=mat.context)
     zeros_like = empty_like  # TODO: currently, empty_like is actually zeros_like
 
@@ -595,7 +595,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         -------
         tmat : DistributedMatrix
         """
-        return cls([mat.global_shape[1], mat.global_shape[0]], block_shape=mat.block_shape,
+        return cls([mat.shape[1], mat.shape[0]], block_shape=mat.block_shape,
                    dtype=mat.dtype, context=mat.context)
 
 
@@ -647,7 +647,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
     def row_indices(self):
         """The row indices of the global array local to the process.
         """
-        return blockcyclic.indices_rc(self.global_shape[0],
+        return blockcyclic.indices_rc(self.shape[0],
                                       self.block_shape[0],
                                       self.context.grid_position[0],
                                       self.context.grid_shape[0])
@@ -656,7 +656,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
     def col_indices(self):
         """The column indices of the global array local to the process.
         """
-        return blockcyclic.indices_rc(self.global_shape[1],
+        return blockcyclic.indices_rc(self.shape[1],
                                       self.block_shape[1],
                                       self.context.grid_position[1],
                                       self.context.grid_shape[1])
@@ -693,10 +693,10 @@ class DistributedMatrix(MatrixLikeAlgebra):
         """
 
         ri, ci = tuple(map(blockcyclic.indices_rc,
-                       self.global_shape,
-                       self.block_shape,
-                       self.context.grid_position,
-                       self.context.grid_shape))
+                           self.shape,
+                           self.block_shape,
+                           self.context.grid_position,
+                           self.context.grid_shape))
 
         ri = ri.reshape((-1, 1), order='F')
         ci = ci.reshape((1, -1), order='F')
@@ -724,7 +724,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
            A.local_array[local_row_index, local_column_index] += global_index**2
         """
 
-        if (not allow_non_square) and (self.global_shape[0] != self.global_shape[1]):
+        if (not allow_non_square) and (self.shape[0] != self.shape[1]):
             #
             # Attempting to access the "diagonal" of a non-square matrix probably indicates a bug.
             # Therefore we raise an exception unless the caller sets the allow_non_square flag.
@@ -732,10 +732,10 @@ class DistributedMatrix(MatrixLikeAlgebra):
             raise RuntimeError('scalapy.core.DistributedMatrix.local_diagonal_indices() called on non-square matrix, and allow_non_square=False')
 
         ri, ci = tuple(map(blockcyclic.indices_rc,
-                       self.global_shape,
-                       self.block_shape,
-                       self.context.grid_position,
-                       self.context.grid_shape))
+                           self.shape,
+                           self.block_shape,
+                           self.context.grid_position,
+                           self.context.grid_shape))
 
         global_index = np.intersect1d(ri, ci)
 
@@ -834,7 +834,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
     def _load_array(self, mat):
         ## Copy the local data out of the global mat.
 
-        if (self.global_shape[0] == 0) or (self.global_shape[1] == 0):
+        if (self.shape[0] == 0) or (self.shape[1] == 0):
             return
 
         self._darr_f.Pack(mat, self.local_array[:], 0, self.context.mpi_comm)
@@ -857,8 +857,8 @@ class DistributedMatrix(MatrixLikeAlgebra):
             The global matrix.
         """
 
-        if (self.global_shape[0] == 0) or (self.global_shape[1] == 0):
-            return np.zeros(self.global_shape, dtype=self.dtype)
+        if (self.shape[0] == 0) or (self.shape[1] == 0):
+            return np.zeros(self.shape, dtype=self.dtype)
 
         comm = self.context.mpi_comm
 
@@ -873,7 +873,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
 
         global_array = None
         if comm.rank == rank or bcast:
-            global_array = np.zeros(self.global_shape, dtype=self.dtype, order='F')
+            global_array = np.zeros(self.shape, dtype=self.dtype, order='F')
 
         # Each process should send its local sections.
         sreq = comm.Isend([self.local_array, self.mpi_dtype], dest=rank, tag=0)
@@ -914,8 +914,8 @@ class DistributedMatrix(MatrixLikeAlgebra):
 
     def __iadd__(self, x, np_op=np.ndarray.__iadd__, op_inplace=True):
         if isinstance(x, DistributedMatrix):
-            if self.global_shape != x.global_shape:
-                raise ValueError(f"operands have different shapes: {self.global_shape}, {x.global_shape}")
+            if self.shape != x.shape:
+                raise ValueError(f"operands have different shapes: {self.shape}, {x.shape}")
             self.assert_same_distribution(x)
             op_result = np_op(self.local_array, x.local_array)
 
@@ -925,7 +925,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         elif isinstance(x, np.ndarray):
             if x.ndim != 2:
                 raise ValueError(f"the numpy operand is not a matrix: v.shape={x.shape}")
-            nr, nc = self.global_shape
+            nr, nc = self.shape
             if x.shape == (nr, nc):
                 op_result = np_op(self.local_array, x[self.row_indices(), :][:, self.col_indices()])
             elif x.shape == (nr, 1):
@@ -933,7 +933,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
             elif x.shape == (1, nc):
                 op_result = np_op(self.local_array, x[:, self.col_indices()])
             else:
-                raise ValueError(f"operands have incompatible shapes: {self.global_shape}, {x.shape}")
+                raise ValueError(f"operands have incompatible shapes: {self.shape}, {x.shape}")
 
         else:
             raise NotImplementedError(f"cannot perform '{np_op}' on {self} and {x}")
@@ -1022,7 +1022,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
             sum_context.Allreduce(MPI.IN_PLACE, local_sum, MPI.SUM)
 
             # Distribute sum results
-            result = np.empty(self.global_shape[free_axis], dtype=self.dtype)
+            result = np.empty(self.shape[free_axis], dtype=self.dtype)
             chunk_dtypes = []
             for remote_rank in range(distribution_context.size):
                 dtype = self.mpi_dtype.Create_darray(
@@ -1053,8 +1053,8 @@ class DistributedMatrix(MatrixLikeAlgebra):
 
     def _section(self, srow=0, nrow=None, scol=0, ncol=None):
         ## return a section [srow:srow+nrow, scol:scol+ncol] of the global array as a new distributed array
-        nrow = self.global_shape[0] - srow if nrow is None else nrow
-        ncol = self.global_shape[1] - scol if ncol is None else ncol
+        nrow = self.shape[0] - srow if nrow is None else nrow
+        ncol = self.shape[1] - scol if ncol is None else ncol
         assert nrow > 0 and ncol > 0, 'Invalid number of rows/columns: %d/%d' % (nrow, ncol)
 
         B = DistributedMatrix([nrow, ncol], dtype=self.dtype, block_shape=self.block_shape, context=self.context)
@@ -1076,8 +1076,8 @@ class DistributedMatrix(MatrixLikeAlgebra):
         # another distributed array B starting at (srowb, scolb)
 
         # Copy to the end of the row/column if the numbers are not set.
-        nrow = self.global_shape[0] - srow if nrow is None else nrow
-        ncol = self.global_shape[1] - scol if ncol is None else ncol
+        nrow = self.shape[0] - srow if nrow is None else nrow
+        ncol = self.shape[1] - scol if ncol is None else ncol
 
         # Check the number of rows and columns
         if nrow <= 0 or ncol <= 0:
@@ -1172,7 +1172,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
                 return m, lst
 
 
-        nrow, ncol = self.global_shape
+        nrow, ncol = self.shape
 
         # First replace any Ellipsis with a full slice(None, None, None) object, this
         # is fine because the matrix is always 2D and it vastly simplifies the logic
@@ -1254,7 +1254,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
     def _copy_from_np(self, a, asrow=0, anrow=None, ascol=0, ancol=None, srow=0, scol=0, block_shape=None, rank=0):
         ## copy a section of a numpy array a[asrow:asrow+anrow, ascol:ascol+ancol] to self[srow:srow+anrow, scol:scol+ancol], once per block_shape
 
-        Nrow, Ncol = self.global_shape
+        Nrow, Ncol = self.shape
         srow = srow if srow >= 0 else srow + Nrow
         srow = max(0, srow)
         srow = min(srow, Nrow)
@@ -1347,7 +1347,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         array owned by rank `rank`. Once copy a section equal or less
         than `block_shape` if the copied section is large.
         """
-        Nrow, Ncol = self.global_shape
+        Nrow, Ncol = self.shape
         srow = srow if srow >= 0 else srow + Nrow
         srow = max(0, srow)
         srow = min(srow, Nrow)
@@ -1419,7 +1419,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
     def assert_not_tiny(self, intro="DistributedMatrix"):
         """Checks if this matrix does not contain empty blocks on any of the processes"""
         if self.is_tiny():
-            raise ValueError(f"{intro}: the matrix with shape {self.global_shape} "
+            raise ValueError(f"{intro}: the matrix with shape {self.shape} "
                              f"contains empty blocks; block_shape={self.block_shape} "
                              f"mpi_grid_shape={self.context.grid_shape}")
 
@@ -1473,7 +1473,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
             Name of file to write to.
         """
 
-        if (self.global_shape[0] == 0) or (self.global_shape[1] == 0):
+        if (self.shape[0] == 0) or (self.shape[1] == 0):
             return
 
         # Open the file, and read out the segments
@@ -1521,9 +1521,9 @@ class DistributedMatrix(MatrixLikeAlgebra):
         if context.mpi_comm != self.context.mpi_comm:
             raise ScalapyException("Can only redsitribute over the same MPI communicator.")
 
-        dm = DistributedMatrix(self.global_shape, dtype=self.dtype, block_shape=block_shape, context=context)
+        dm = DistributedMatrix(self.shape, dtype=self.dtype, block_shape=block_shape, context=context)
 
-        args = [self.global_shape[0], self.global_shape[1], self, dm, self.context.blacs_context]
+        args = [self.shape[0], self.shape[1], self, dm, self.context.blacs_context]
 
         # Prepare call table
         call_table = {'S': (ll.psgemr2d, args),
@@ -1543,7 +1543,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
 
         trans = DistributedMatrix.empty_trans(self)
 
-        args = [self.global_shape[1], self.global_shape[0], 1.0, self, 0.0, trans]
+        args = [self.shape[1], self.shape[0], 1.0, self, 0.0, trans]
 
         call_table = {'S': (ll.pstran, args),
                       'D': (ll.pdtran, args),
@@ -1593,7 +1593,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         # if complex
         hermi = DistributedMatrix.empty_trans(self)
 
-        args = [self.global_shape[1], self.global_shape[0], 1.0, self, 0.0, hermi]
+        args = [self.shape[1], self.shape[0], 1.0, self, 0.0, hermi]
 
         call_table = {'C': (ll.pctranc, args),
                       'Z': (ll.pztranc, args)}
@@ -1646,14 +1646,14 @@ def dot_mat_mat(a, b, trans_a='N', trans_b='N', alpha=1., beta=0., out=None):
     if a.dtype != b.dtype:
         raise ScalapyException(f"a.dtype={a.dtype} != b.dtype={b.dtype}")
 
-    m = a.global_shape[0] if trans_a == 'N' else a.global_shape[1]
-    n = b.global_shape[1] if trans_b == 'N' else b.global_shape[0]
-    k = a.global_shape[1] if trans_a == 'N' else a.global_shape[0]
-    l = b.global_shape[0] if trans_b == 'N' else b.global_shape[1]
+    m = a.shape[0] if trans_a == 'N' else a.shape[1]
+    n = b.shape[1] if trans_b == 'N' else b.shape[0]
+    k = a.shape[1] if trans_a == 'N' else a.shape[0]
+    l = b.shape[0] if trans_b == 'N' else b.shape[1]
 
     if l != k:
-        raise ScalapyException(f"dimension mismatch a.shape={a.global_shape} trans_a={trans_a} and "
-                               f"b.shape={b.global_shape} trans_b={trans_b}")
+        raise ScalapyException(f"dimension mismatch a.shape={a.shape} trans_a={trans_a} and "
+                               f"b.shape={b.shape} trans_b={trans_b}")
 
     # TODO: fix small matrices?
     a.assert_not_tiny("A")
@@ -1661,8 +1661,8 @@ def dot_mat_mat(a, b, trans_a='N', trans_b='N', alpha=1., beta=0., out=None):
 
     if out is not None:
         a.assert_same_distribution(out)
-        if out.global_shape != (m, n):
-            raise ScalapyException(f"out.shape={out.global_shape} != {(m, n)}")
+        if out.shape != (m, n):
+            raise ScalapyException(f"out.shape={out.shape} != {(m, n)}")
         if a.dtype != out.dtype:
             raise ScalapyException(f"a.dtype={a.dtype} != out.dtype={out.dtype}")
     else:
