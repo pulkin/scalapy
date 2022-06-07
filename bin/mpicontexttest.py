@@ -41,7 +41,7 @@ if rank == 0:
 world_comm.Barrier()
 
 # Create the Process Context
-context = pscore.ProcessContext(comm=new_comm, gridsize=[2,2])
+context = pscore.GridContext(comm=new_comm, gridsize=[2, 2])
 
 # Create a distributed matrix and find its eigenvalues
 dm = pscore.DistributedMatrix.from_npy("testarr_%i.npy" % group_index, context=context)

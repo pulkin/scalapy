@@ -7,7 +7,7 @@ pos_list = [(0, 0), (0, 1), (1, 0), (1, 1)]
 
 
 def test_process_context():
-    pc = core.ProcessContext([2, 2], comm=mpi_comm)
+    pc = core.GridContext([2, 2], comm=mpi_comm)
 
     # Test grid shape is correct
     assert pc.shape == (2, 2)

@@ -41,7 +41,7 @@ import numpy as np
 from mpi4py import MPI
 
 from . import blockcyclic
-from . import blacs
+from .blacs import GridContext
 from . import mpi3util
 from . import lowlevel as ll
 
@@ -102,7 +102,7 @@ def initmpi(gridshape=None, block_shape=[32, 32]):
     global _context, _block_shape
 
     # Setup the default context
-    _context = ProcessContext(gridshape)
+    _context = GridContext(gridshape)
 
     # Set default blocksize
     _block_shape = tuple(block_shape)
@@ -156,7 +156,6 @@ def create_1d_comm_group(context, dim):
     return comm.Create_group(comm.group.Incl(context.rank_grid[ix]))
 
 
-ProcessContext = blacs.GridContext
 initmpi()
 
 
@@ -1213,14 +1212,14 @@ class DistributedMatrix(MatrixLikeAlgebra):
         rn = n - (bc - 1) * bn # remained number of columes of the last block
 
         # due to bugs in scalapy, it is needed to first init an process context here
-        ProcessContext([1, self.context.comm.size], comm=self.context.comm) # process context
+        GridContext([1, self.context.comm.size], comm=self.context.comm) # process context
 
         for bri in range(br):
             M = bm if bri != br - 1 else rm
             for bci in range(bc):
                 N = bn if bci != bc - 1 else rn
                 if self.context.comm.rank == rank:
-                    pc = ProcessContext([1, 1], comm=MPI.COMM_SELF) # process context
+                    pc = GridContext([1, 1], comm=MPI.COMM_SELF) # process context
                     desc = self.desc
                     desc[1] = pc
                     desc[2], desc[3] = a.shape
@@ -1291,14 +1290,14 @@ class DistributedMatrix(MatrixLikeAlgebra):
         rn = n - (bc - 1) * bn # remained number of columes of the last block
 
         # due to bugs in scalapy, it is needed to first init an process context here
-        ProcessContext([1, self.context.comm.size], comm=self.context.comm) # process context
+        GridContext([1, self.context.comm.size], comm=self.context.comm) # process context
 
         for bri in range(br):
             M = bm if bri != br - 1 else rm
             for bci in range(bc):
                 N = bn if bci != bc - 1 else rn
                 if self.context.comm.rank == rank:
-                    pc = ProcessContext([1, 1], comm=MPI.COMM_SELF) # process context
+                    pc = GridContext([1, 1], comm=MPI.COMM_SELF) # process context
                     desc = self.desc
                     desc[1] = pc
                     desc[2], desc[3] = a.shape
