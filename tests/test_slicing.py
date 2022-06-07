@@ -5,7 +5,7 @@ import numpy as np
 from scalapy import core
 
 assert_mpi_env(size=4)
-test_context = {"gridshape": (2, 2), "block_shape": (2, 2)}
+test_context = {"block_shape": (2, 2)}
 
 
 def test_dm_slicing():

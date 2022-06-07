@@ -7,7 +7,7 @@ from scalapy import core
 import scalapy.routines as rt
 
 assert_mpi_env(size=4)
-test_context = {"gridshape": (2, 2), "block_shape": (16, 16)}
+test_context = {"block_shape": (16, 16)}
 
 
 def h_conj(a):

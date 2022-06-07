@@ -56,8 +56,8 @@ class ScalapackException(Exception):
     pass
 
 
-_context = None
-_block_shape = None
+default_grid_context = GridContext()
+default_block_shape = (32, 32)
 
 
 # Map numpy type into MPI type
@@ -83,51 +83,29 @@ def _chk_2d_size(shape, positive=True):
     return True
 
 
-def initmpi(gridshape=None, block_shape=[32, 32]):
-    r"""Initialise Scalapack on the current process.
-
-    This routine sets up the BLACS grid, and sets the default context
-    for this process.
-
-    Parameters
-    ----------
-    gridsize : array_like
-        A two element list (or other tuple etc), containing the
-        requested shape for the process grid e.g. `[nprow, npcol]`.
-    block_shape : array_like, optional
-        The default blocksize for new arrays. A two element, [`brow,
-        bcol]` list.
-    """
-
-    global _context, _block_shape
-
-    # Setup the default context
-    _context = GridContext(gridshape)
-
-    # Set default blocksize
-    _block_shape = tuple(block_shape)
-
-
 @contextmanager
-def shape_context(gridshape=None, block_shape=[32, 32]):
+def shape_context(context=None, block_shape=None):
     """
     Sets a temporary context for Scalapack matrix distribution.
 
     Parameters
     ----------
-    gridshape
-        Process grid as a pair of integers.
-    block_shape
-        Contiguous matrix block size ad a pair of integers.
+    context : GridContext
+        Process grid context to work with.
+    block_shape : tuple
+        Matrix block size ad a pair of integers.
     """
-    global _context, _block_shape
+    global default_grid_context, default_block_shape
 
-    prev_context = _context
-    prev_bs = _block_shape
-    initmpi(gridshape=gridshape, block_shape=block_shape)
+    prev_context = default_grid_context
+    prev_bs = default_block_shape
+    if context is not None:
+        default_grid_context = context
+    if block_shape is not None:
+        default_block_shape = tuple(block_shape)
     yield None
-    _context = prev_context
-    _block_shape = prev_bs
+    default_grid_context = prev_context
+    default_block_shape = prev_bs
 
 
 def create_1d_comm_group(context, dim):
@@ -154,9 +132,6 @@ def create_1d_comm_group(context, dim):
     else:
         ix = slice(None), pos[1]
     return comm.Create_group(comm.group.Incl(context.rank_grid[ix]))
-
-
-initmpi()
 
 
 class MatrixLikeAlgebra:
@@ -389,10 +364,10 @@ class DistributedMatrix(MatrixLikeAlgebra):
         self._global_shape = tuple(global_shape)
 
         ## Check and set default block_shape
-        if not _block_shape and not block_shape:
+        if not default_block_shape and not block_shape:
             raise ScalapyException("No supplied or default blocksize.")
 
-        block_shape = block_shape if block_shape else _block_shape
+        block_shape = block_shape if block_shape else default_block_shape
 
         # Validate block_shape.
         if not _chk_2d_size(block_shape):
@@ -401,9 +376,9 @@ class DistributedMatrix(MatrixLikeAlgebra):
         self._block_shape = block_shape
 
         ## Check and set context.
-        if not context and not _context:
+        if not context and not default_grid_context:
             raise ScalapyException("No supplied or default context.")
-        self._context = context if context else _context
+        self._context = context if context else default_grid_context
 
         # Allocate the local array.
         self._loccal_empty = True if self.local_shape[0] == 0 or self.local_shape[1] == 0 else False
@@ -691,7 +666,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         """
         # Broadcast if rank is not set.
         if rank is not None:
-            comm = context.comm if context else _context.comm
+            comm = context.comm if context else default_grid_context.comm
 
             # Double check that rank is valid.
             if rank < 0 or rank >= comm.size:

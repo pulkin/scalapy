@@ -10,7 +10,7 @@ import scalapy.routines as rt
 
 assert_mpi_env(size=4)
 # TODO: tests fail with the default context
-test_context = {"gridshape": (2, 2), "block_shape": (3, 3)}
+test_context = {"block_shape": (3, 3)}
 
 
 @pytest.mark.parametrize("shape,dtype,rank,pinv", [

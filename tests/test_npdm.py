@@ -7,7 +7,7 @@ from scalapy import core
 
 
 assert_mpi_env(size=4)
-test_context = {"gridshape": (2, 2), "block_shape": (3, 3)}
+test_context = {"block_shape": (3, 3)}
 
 
 @pytest.mark.parametrize("dtype,fw_rank,bw_rank", [

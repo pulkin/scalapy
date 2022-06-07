@@ -38,7 +38,7 @@ class BlacsContext:
 
 
 class GridContext:
-    def __init__(self, shape, order="Row", blacs_context=None, comm=None):
+    def __init__(self, shape=None, order="Row", blacs_context=None, comm=None):
         cdef int n_rows, n_cols
 
         if blacs_context is None:

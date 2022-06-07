@@ -38,7 +38,7 @@ def test_blacs_cleanup():
 
 def test_default():
     """Tests the default context"""
-    context = core._context
+    context = core.default_grid_context
     assert context.shape == (2, 2)
 
     core.DistributedMatrix((100, 100))

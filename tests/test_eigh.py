@@ -7,7 +7,7 @@ from scalapy import core
 import scalapy.routines as rt
 
 assert_mpi_env(size=4)
-test_context = {"gridshape": (2, 2), "block_shape": (3, 3)}
+test_context = {"block_shape": (3, 3)}
 multiple_shape_parameters = pytest.mark.parametrize("size,dtype,atol", [
     (269, np.float32, 2e-3),
     (270, np.float64, 1e-7),
@@ -50,7 +50,7 @@ def test_eigh_generalized_fail():
         dtype = np.complex128
         a_distributed, a = random_hermitian_distributed((size, size), dtype)
 
-        with core.shape_context(gridshape=(2, 2), block_shape=(4, 4)):
+        with core.shape_context(block_shape=(4, 4)):
             b_distributed, b = random_hermitian_distributed((size, size), dtype)
 
         with pytest.raises(AssertionError):
