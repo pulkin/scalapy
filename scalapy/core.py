@@ -210,7 +210,7 @@ class ProcessContext(object):
 
 
     @property
-    def all_mpi_ranks(self):
+    def rank_grid(self):
         """Inverse of all_grid_positions: returns 2D array such that arr[i,j] gives the mpi rank at grid position (i,j)."""
         return self.blacs_context.rank_grid
 
