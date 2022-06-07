@@ -64,7 +64,7 @@ def test_dm_redistribute():
 
         np.testing.assert_equal(dm2x2.local_array, rd2x2.local_array)
 
-        pc2 = core.ProcessContext([4, 1], mpi_comm)
+        pc2 = core.ProcessContext([4, 1], comm=mpi_comm)
 
         dmpc2 = core.DistributedMatrix.from_global_array(a, block_shape=[1, 1], context=pc2)
         rdpc2 = dm3x3.redistribute(block_shape=[1, 1], context=pc2)

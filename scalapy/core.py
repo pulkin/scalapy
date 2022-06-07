@@ -156,79 +156,7 @@ def create_1d_comm_group(context, dim):
     return comm.Create_group(comm.group.Incl(context.rank_grid[ix]))
 
 
-class ProcessContext(object):
-    r"""Stores information about an MPI/BLACS process.
-
-    Parameters
-    ----------
-    gridshape : array_like
-        A two element list (or other tuple etc), containing the
-        requested shape for the process grid e.g. [nprow, npcol].
-
-    comm : mpi4py.MPI.Comm, optional
-        The MPI communicator to create a BLACS context for. If comm=None,
-        then use MPI.COMM_WORLD instead.
-
-    Attributes
-    ----------
-    grid_shape
-    grid_position
-    mpi_comm
-    blacs_context
-    all_grid_positions
-    all_mpi_ranks
-    """
-
-    @property
-    def shape(self):
-        """Process grid shape."""
-        return self.blacs_context.shape
-
-    @property
-    def pos(self):
-        """Process grid position."""
-        return self.blacs_context.pos
-
-    @property
-    def comm(self):
-        """MPI Communicator for this ProcessContext."""
-        return self.blacs_context.comm
-
-
-    _blacs_context = None
-
-    @property
-    def blacs_context(self):
-        """BLACS context handle."""
-        return self._blacs_context
-
-
-    @property
-    def pos_all(self):
-        """Returns shape (mpi_comm_size,2) array, such that (arr[i,0], arr[i,1]) gives the grid position of mpi task i."""
-        return self.blacs_context.pos_all
-
-
-    @property
-    def rank_grid(self):
-        """Inverse of all_grid_positions: returns 2D array such that arr[i,j] gives the mpi rank at grid position (i,j)."""
-        return self.blacs_context.rank_grid
-
-
-    def __init__(self, grid_shape, comm=None):
-        """Construct a BLACS context for the current process.
-        """
-
-        # Initialise BLACS context
-        self._blacs_context = blacs.GridContext(grid_shape, comm=comm)
-
-    def __eq__(self, other):
-        return self.blacs_context == other.blacs_context
-
-    def __repr__(self):
-        return f"ProcessContext(rank={self.comm.rank}, grid={self.shape}, grid_pos={self.pos})"
-
-
+ProcessContext = blacs.GridContext
 initmpi()
 
 
@@ -498,7 +426,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         self._desc = np.zeros(9, dtype=np.int32)
 
         self._desc[0] = 1  # Dense matrix
-        self._desc[1] = self.context.blacs_context
+        self._desc[1] = self.context
         self._desc[2] = self.shape[0]
         self._desc[3] = self.shape[1]
         self._desc[4] = self.block_shape[0]
@@ -994,7 +922,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         elif axis == {0} or axis == {1}:
             sum_axis = axis.pop()
             free_axis = not sum_axis
-            rc_contexts = create_1d_comm_group(self.context.blacs_context, 1), create_1d_comm_group(self.context.blacs_context, 0)
+            rc_contexts = create_1d_comm_group(self.context, 1), create_1d_comm_group(self.context, 0)
             sum_context = rc_contexts[sum_axis]
             distribution_context = rc_contexts[free_axis]
 
@@ -1042,7 +970,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
 
         B = DistributedMatrix([nrow, ncol], dtype=self.dtype, block_shape=self.block_shape, context=self.context)
 
-        args = [nrow, ncol, self._local_array , srow+1, scol+1, self.desc, B._local_array, 1, 1, B.desc, self.context.blacs_context]
+        args = [nrow, ncol, self._local_array , srow+1, scol+1, self.desc, B._local_array, 1, 1, B.desc, self.context]
 
         call_table = {'S': (ll.psgemr2d, args),
                       'D': (ll.pdgemr2d, args),
@@ -1070,7 +998,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         args = [nrow, ncol,
                 self._local_array, srow+1, scol+1, self.desc,
                 B._local_array, srowb+1, scolb+1, B.desc,
-                self.context.blacs_context]
+                self.context]
 
         call_table = {'S': (ll.psgemr2d, args),
                       'D': (ll.pdgemr2d, args),
@@ -1294,15 +1222,15 @@ class DistributedMatrix(MatrixLikeAlgebra):
                 if self.context.comm.rank == rank:
                     pc = ProcessContext([1, 1], comm=MPI.COMM_SELF) # process context
                     desc = self.desc
-                    desc[1] = pc.blacs_context
+                    desc[1] = pc
                     desc[2], desc[3] = a.shape
                     desc[4], desc[5] = a.shape
                     desc[8] = a.shape[0]
-                    args = [M, N, a, asrow+1+bm*bri, ascol+1+bn*bci, desc, self._local_array, srow+1+bm*bri, scol+1+bn*bci, self.desc, self.context.blacs_context]
+                    args = [M, N, a, asrow+1+bm*bri, ascol+1+bn*bci, desc, self._local_array, srow+1+bm*bri, scol+1+bn*bci, self.desc, self.context]
                 else:
                     desc = np.zeros(9, dtype=np.int32)
                     desc[1] = -1
-                    args = [M, N, np.zeros(1, dtype=self.dtype) , asrow+1+bm*bri, ascol+1+bn*bci, desc, self._local_array, srow+1+bm*bri, scol+1+bn*bci, self.desc, self.context.blacs_context]
+                    args = [M, N, np.zeros(1, dtype=self.dtype) , asrow+1+bm*bri, ascol+1+bn*bci, desc, self._local_array, srow+1+bm*bri, scol+1+bn*bci, self.desc, self.context]
 
                 call_table = {'S': (ll.psgemr2d, args),
                               'D': (ll.pdgemr2d, args),
@@ -1372,15 +1300,15 @@ class DistributedMatrix(MatrixLikeAlgebra):
                 if self.context.comm.rank == rank:
                     pc = ProcessContext([1, 1], comm=MPI.COMM_SELF) # process context
                     desc = self.desc
-                    desc[1] = pc.blacs_context
+                    desc[1] = pc
                     desc[2], desc[3] = a.shape
                     desc[4], desc[5] = a.shape
                     desc[8] = a.shape[0]
-                    args = [M, N, self._local_array, srow+1+bm*bri, scol+1+bn*bci, self.desc, a , 1+bm*bri, 1+bn*bci, desc, self.context.blacs_context]
+                    args = [M, N, self._local_array, srow+1+bm*bri, scol+1+bn*bci, self.desc, a , 1+bm*bri, 1+bn*bci, desc, self.context]
                 else:
                     desc = np.zeros(9, dtype=np.int32)
                     desc[1] = -1
-                    args = [M, N, self._local_array, srow+1+bm*bri, scol+1+bn*bci, self.desc, np.zeros(1, dtype=self.dtype) , 1+bm*bri, 1+bn*bci, desc, self.context.blacs_context]
+                    args = [M, N, self._local_array, srow+1+bm*bri, scol+1+bn*bci, self.desc, np.zeros(1, dtype=self.dtype) , 1+bm*bri, 1+bn*bci, desc, self.context]
 
                 call_table = {'S': (ll.psgemr2d, args),
                               'D': (ll.pdgemr2d, args),
@@ -1506,7 +1434,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
 
         dm = DistributedMatrix(self.shape, dtype=self.dtype, block_shape=block_shape, context=context)
 
-        args = [self.shape[0], self.shape[1], self, dm, self.context.blacs_context]
+        args = [self.shape[0], self.shape[1], self, dm, self.context]
 
         # Prepare call table
         call_table = {'S': (ll.psgemr2d, args),
