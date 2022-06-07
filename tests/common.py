@@ -4,7 +4,7 @@ import numpy as np
 from scipy.stats import ortho_group, unitary_group
 from mpi4py import MPI
 
-from scalapy.core import DistributedMatrix
+from scalapy.core import DistributedMatrix, fromnumpy
 
 
 mpi_comm = MPI.COMM_WORLD
@@ -132,7 +132,7 @@ def random_distributed(shape, dtype, intermediate=None, f_random=random):
         a = intermediate(a)
     a = np.asfortranarray(a.astype(dtype))
     mpi_comm.Bcast(a, 0)
-    a_distributed = DistributedMatrix.from_global_array(a, rank=0)
+    a_distributed = fromnumpy(a, rank=0)
     return a_distributed, a
 
 

@@ -642,78 +642,6 @@ class DistributedMatrix(MatrixLikeAlgebra):
 
         return ret
 
-    @classmethod
-    def from_global_array(cls, mat, rank=None, block_shape=None, context=None):
-
-        r"""Create a DistributedMatrix directly from the global `array`.
-
-        Parameters
-        ----------
-        mat : ndarray
-            The global array to extract the local segments of.
-        rank : integer
-            Broadcast global matrix from given rank, to all ranks if set.
-            Otherwise, if rank=None, assume all processes have a copy.
-        block_shape: list of integers, optional
-            The blocking size in [Br, Bc]. If `None` uses the default
-            blocking (set via `initmpi`).
-        context : ProcessContext, optional
-            The process context. If not set uses the default (recommended).
-
-        Returns
-        -------
-        dm : DistributedMatrix
-        """
-        # Broadcast if rank is not set.
-        if rank is not None:
-            comm = context.comm if context else default_grid_context.comm
-
-            # Double check that rank is valid.
-            if rank < 0 or rank >= comm.size:
-                raise ScalapyException("Invalid rank.")
-
-            if comm.rank == rank:
-                if mat.ndim != 2:
-                    raise ScalapyException("Array must be 2d.")
-
-                mat = np.asfortranarray(mat)
-                mat_shape = mat.shape
-                mat_dtype = mat.dtype.type
-            else:
-                mat_shape = None
-                mat_dtype = None
-
-            mat_shape = comm.bcast(mat_shape, root=rank)
-            mat_dtype = comm.bcast(mat_dtype, root=rank)
-
-            m = cls(mat_shape, block_shape=block_shape, dtype=mat_dtype, context=context)
-
-            if mat_shape[0] != 0 and mat_shape[1] != 0:
-                # Each process should receive its local sections.
-                rreq = comm.Irecv([m.local_array, m.mpi_dtype], source=rank, tag=0)
-
-                if comm.rank == rank:
-                    # Post each send
-                    reqs = [ comm.Isend([mat, m._darr_list[dt]], dest=dt, tag=0)
-                                 for dt in range(comm.size) ]
-
-                    # Wait for requests to complete
-                    MPI.Prequest.Waitall(reqs)
-
-                rreq.Wait()
-
-        else:
-            if mat.ndim != 2:
-                raise ScalapyException("Array must be 2d.")
-
-            m = cls(mat.shape, block_shape=block_shape, dtype=mat.dtype.type, context=context)
-
-            mat = np.asfortranarray(mat)
-            m._load_array(mat)
-
-        return m
-
-
     def _load_array(self, mat):
         ## Copy the local data out of the global mat.
 
@@ -1596,3 +1524,78 @@ def dot_mat_vec(a, v, left=False):
         return (a * v[:, None]).sum(axis=0)
     else:
         return (a * v[None, :]).sum(axis=1)
+
+
+def fromnumpy(mat, rank=None, out=None):
+    """
+    Distributes numpy matrix.
+
+    Parameters
+    ----------
+    mat : np.ndarray
+        The matrix to distribute.
+    rank : int
+        Indicates that the matrix `a` is only available
+        in the process specified by this rank.
+    out : DistributedMatrix
+        The output to use.
+
+    Returns
+    -------
+    out : DistributedMatrix
+        The resulting distributed matrix.
+    """
+    # Broadcast if rank is not set.
+    if rank is not None:
+        comm = default_grid_context.comm
+
+        # Double check that rank is valid.
+        if rank < 0 or rank >= comm.size:
+            raise ScalapyException("Invalid rank.")
+
+        if comm.rank == rank:
+            if mat.ndim != 2:
+                raise ScalapyException("Array must be 2d.")
+
+            mat = np.asfortranarray(mat)
+            mat_shape = mat.shape
+            mat_dtype = mat.dtype.type
+        else:
+            mat_shape = None
+            mat_dtype = None
+
+        mat_shape = comm.bcast(mat_shape, root=rank)
+        mat_dtype = comm.bcast(mat_dtype, root=rank)
+
+        if out is not None:
+            if out.shape != mat_shape:
+                raise ValueError(f"out.shape mismatch: expected {mat_shape}, found {out.shape}")
+            if out.dtype != mat_dtype:
+                raise ValueError(f"out.dtype mismatch: expected {mat_dtype}, found {out.dtype}")
+        else:
+            out = DistributedMatrix(mat_shape, dtype=mat_dtype)
+
+        if mat_shape[0] != 0 and mat_shape[1] != 0:
+            # Each process should receive its local sections.
+            rreq = comm.Irecv([out.local_array, out.mpi_dtype], source=rank, tag=0)
+
+            if comm.rank == rank:
+                # Post each send
+                reqs = [comm.Isend([mat, out._darr_list[dt]], dest=dt, tag=0)
+                        for dt in range(comm.size)]
+
+                # Wait for requests to complete
+                MPI.Prequest.Waitall(reqs)
+
+            rreq.Wait()
+
+    else:
+        if mat.ndim != 2:
+            raise ScalapyException("Array must be 2d.")
+
+        out = DistributedMatrix(mat.shape, dtype=mat.dtype.type)
+
+        mat = np.asfortranarray(mat)
+        out._load_array(mat)
+
+    return out

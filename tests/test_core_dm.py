@@ -29,7 +29,7 @@ def test_dm_load_5x5():
     with core.shape_context(**test_context):
         distributed_a, a = random_distributed((5, 5), float)
         blocks = [a[:3, :3], a[:3, 3:], a[3:, :3], a[3:, 3:]]
-        dm = core.DistributedMatrix.from_global_array(a)
+        dm = core.fromnumpy(a)
 
         np.testing.assert_equal(dm.local_array, blocks[mpi_rank])
 
@@ -45,7 +45,8 @@ def test_dm_cycle(g_shape, b_shape):
         nr, nc = g_shape
         arr = np.arange(nr*nc, dtype=np.float64).reshape(nr, nc)
 
-        dm = core.DistributedMatrix.from_global_array(arr, block_shape=b_shape)
+        with core.shape_context(block_shape=b_shape):
+            dm = core.fromnumpy(arr)
         np.testing.assert_equal(dm.to_global_array(), arr)
 
 
@@ -57,8 +58,10 @@ def test_dm_redistribute():
         _, a = random_distributed((5, 5), float)
 
         # Create DistributedMatrix
-        dm3x3 = core.DistributedMatrix.from_global_array(a, block_shape=[3, 3])
-        dm2x2 = core.DistributedMatrix.from_global_array(a, block_shape=[2, 2])
+        with core.shape_context(block_shape=(3, 3)):
+            dm3x3 = core.fromnumpy(a)
+        with core.shape_context(block_shape=(2, 2)):
+            dm2x2 = core.fromnumpy(a)
 
         rd2x2 = dm3x3.redistribute(block_shape=[2, 2])
 
@@ -66,7 +69,8 @@ def test_dm_redistribute():
 
         pc2 = core.GridContext([4, 1], comm=mpi_comm)
 
-        dmpc2 = core.DistributedMatrix.from_global_array(a, block_shape=[1, 1], context=pc2)
+        with core.shape_context(block_shape=(1, 1), context=pc2):
+            dmpc2 = core.fromnumpy(a)
         rdpc2 = dm3x3.redistribute(block_shape=[1, 1], context=pc2)
 
         np.testing.assert_equal(dmpc2.local_array, rdpc2.local_array)

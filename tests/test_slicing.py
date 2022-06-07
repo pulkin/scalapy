@@ -14,6 +14,6 @@ def test_dm_slicing():
         a_distributed, a = random_distributed((5, 5), np.float64)
         a_slice_distributed = a_distributed[1:4, -3:]
         a_slice = a[1:4, -3:]
-        test = core.DistributedMatrix.from_global_array(a_slice)
+        test = core.fromnumpy(a_slice)
 
         np.testing.assert_equal(a_slice_distributed.local_array, test.local_array)
