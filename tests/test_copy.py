@@ -22,6 +22,6 @@ def test_copy_d(shape, dtype, spy_copy, npy_copy):
 
         a_distributed, a = random_distributed(shape, dtype)
         b_distributed = spy_copy(a_distributed)
-        b = b_distributed.to_global_array()
+        b = b_distributed.numpy()
 
         np.testing.assert_equal(npy_copy(a), b)

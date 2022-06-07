@@ -21,8 +21,8 @@ def test_qr(shape, dtype):
     with core.shape_context(**test_context):
         a_distributed, a = random_distributed(shape, dtype)
         q_distributed, r_distributed = rt.qr(a_distributed)
-        q = q_distributed.to_global_array()
-        r = r_distributed.to_global_array()
+        q = q_distributed.numpy()
+        r = r_distributed.numpy()
 
         _q, _r = np.linalg.qr(a)
         np.testing.assert_allclose(q.conj().T @ q, np.eye(q.shape[1]), err_msg="orthonormal", atol=1e-14)

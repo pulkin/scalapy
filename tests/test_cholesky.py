@@ -20,7 +20,7 @@ def test_cholesky(size, dtype, lower):
     with core.shape_context(**test_context):
         a_distributed, a = random_pd_distributed((size, size), dtype)
         u_distributed = rt.cholesky(a_distributed, lower=lower)
-        u = u_distributed.to_global_array()
+        u = u_distributed.numpy()
 
         ref = la.cholesky(a, lower=lower)
         np.testing.assert_allclose(u, ref, rtol=1e-4, atol=1e-6)

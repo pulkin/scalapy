@@ -25,7 +25,7 @@ def test_pinv(shape, dtype, rank, pinv):
     with core.shape_context(**test_context):
         a_distributed, a = random_lr_distributed(shape, dtype, rank=rank)
         a_pinv_distributed = pinv(a_distributed)
-        a_pinv = a_pinv_distributed.to_global_array()[:shape[1]]
+        a_pinv = a_pinv_distributed.numpy()[:shape[1]]
 
         np.testing.assert_allclose(a, a @ a_pinv @ a, err_msg="a = a @ p @ a", atol=1e-10)
         np.testing.assert_allclose(a_pinv, a_pinv @ a @ a_pinv, err_msg="p = p @ a @ p", atol=1e-10)

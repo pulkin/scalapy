@@ -47,7 +47,7 @@ def test_dm_cycle(g_shape, b_shape):
 
         with core.shape_context(block_shape=b_shape):
             dm = core.fromnumpy(arr)
-        np.testing.assert_equal(dm.to_global_array(), arr)
+        np.testing.assert_equal(dm.numpy(), arr)
 
 
 def test_dm_redistribute():

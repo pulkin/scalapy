@@ -19,8 +19,8 @@ def test_svd(shape, dtype):
     with core.shape_context(**test_context):
         a_distributed, a = random_distributed(shape, dtype)
         u_distributed, s, vt_distributed = rt.svd(a_distributed)
-        u = u_distributed.to_global_array()
-        vt = vt_distributed.to_global_array()
+        u = u_distributed.numpy()
+        vt = vt_distributed.numpy()
 
         np.testing.assert_allclose(a, u * s[None, :] @ vt, err_msg="u @ s @ vt = a", atol=1e-10)
         np.testing.assert_allclose(u.conj().T @ u, np.eye(u.shape[1]), err_msg="u not orthonormal", atol=1e-10)

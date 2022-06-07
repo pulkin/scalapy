@@ -20,7 +20,7 @@ def test_lu(size, dtype):
     with core.shape_context(**test_context):
         a_distributed, a = random_distributed((size, size), dtype)
         a_lu_distributed, a_pivot_distributed = rt.lu(a_distributed)
-        a_lu = a_lu_distributed.to_global_array()
+        a_lu = a_lu_distributed.numpy()
 
         p, l, u = la.lu(a)
         np.testing.assert_allclose(a_lu, l + u - np.eye(size), atol=1e-10)

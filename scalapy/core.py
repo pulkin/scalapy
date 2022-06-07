@@ -224,8 +224,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
     -------
     empty_like
     indices
-    from_global_array
-    to_global_array
+    numpy
     from_file
     to_file
     redistribute
@@ -650,8 +649,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
 
         self._darr_f.Pack(mat, self.local_array[:], 0, self.context.comm)
 
-
-    def to_global_array(self, rank=None):
+    def numpy(self, rank=None):
         """Copy distributed data into a global array.
 
         This is mainly intended for testing. Would be a bad idea for larger problems.

@@ -28,6 +28,6 @@ def test_trans(shape, dtype, np_op, spy_op):
     with core.shape_context(**test_context):
         a_distributed, a = random_distributed(shape, dtype)
         at_distributed = spy_op(a_distributed)
-        at = at_distributed.to_global_array()
+        at = at_distributed.numpy()
 
         np.testing.assert_equal(np_op(a), at)
