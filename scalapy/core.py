@@ -1597,3 +1597,25 @@ def fromnumpy(mat, rank=None, out=None):
         out._load_array(mat)
 
     return out
+
+
+def matrix(source, rank=None):
+    """
+    Converts input to a distributed matrix.
+
+    Parameters
+    ----------
+    source
+        The source object.
+    rank : int
+        Indicates that the input is only available
+        in the process specified by this rank.
+
+    Returns
+    -------
+    out : DistributedMatrix
+        The resulting distributed matrix.
+    """
+    if rank is None or default_grid_context.comm.rank == rank:
+        source = np.array(source)
+    return fromnumpy(source, rank=rank)
