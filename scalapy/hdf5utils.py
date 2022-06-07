@@ -129,7 +129,7 @@ def write_matrix(a, f, dataset_name, root=0, memlimit_gb=1.0, nblocks=None):
     if not isinstance(a, core.DistributedMatrix):
         raise RuntimeError('write_matrix: expected either rank-2 numpy array or scalapy.core.DistributedMatrix')
 
-    mpi_rank = a.context.mpi_comm.rank
+    mpi_rank = a.context.comm.rank
     nrows_global = a.shape[0]
     ncols_global = a.shape[1]
 
@@ -151,7 +151,7 @@ def write_matrix(a, f, dataset_name, root=0, memlimit_gb=1.0, nblocks=None):
 
     assert nblocks > 0
     assert np.sum(col_counts) == ncols_global
-    assert 0 <= root < a.context.mpi_comm.size
+    assert 0 <= root < a.context.comm.size
 
     if mpi_rank == root:
         assert isinstance(f, h5py.Group)
@@ -194,7 +194,7 @@ def write_matrix(a, f, dataset_name, root=0, memlimit_gb=1.0, nblocks=None):
             assert (j == len(r)) or (r[j] >= grj)
 
         # now ready for mpi_gather!
-        a.context.mpi_comm.Gatherv(sbuf, (rbuf,(mpi_counts,mpi_displs)), root=root)
+        a.context.comm.Gatherv(sbuf, (rbuf, (mpi_counts, mpi_displs)), root=root)
         del sbuf
 
         if mpi_rank != root:

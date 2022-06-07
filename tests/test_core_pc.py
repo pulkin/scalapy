@@ -16,7 +16,7 @@ def test_process_context():
     assert pc.pos == pos_list[mpi_rank]
 
     # Test the MPI communicator is correct
-    assert mpi_comm is pc.mpi_comm
+    assert mpi_comm is pc.comm
 
 
 def test_initmpi():

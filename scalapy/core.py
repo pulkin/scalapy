@@ -190,7 +190,7 @@ class ProcessContext(object):
         return self.blacs_context.pos
 
     @property
-    def mpi_comm(self):
+    def comm(self):
         """MPI Communicator for this ProcessContext."""
         return self.blacs_context.comm
 
@@ -228,7 +228,7 @@ class ProcessContext(object):
         return self.shape == other.shape and self.pos == other.pos
 
     def __repr__(self):
-        return f"ProcessContext(rank={self.mpi_comm.rank}, grid={self.shape}, grid_pos={self.pos})"
+        return f"ProcessContext(rank={self.comm.rank}, grid={self.shape}, grid_pos={self.pos})"
 
 
 initmpi()
@@ -519,8 +519,8 @@ class DistributedMatrix(MatrixLikeAlgebra):
             self._darr_c = None
             self._darr_list = []
         else:
-            rank = self.context.mpi_comm.rank
-            size = self.context.mpi_comm.size
+            rank = self.context.comm.rank
+            size = self.context.comm.size
 
             # Create distributed array view (F-ordered)
             self._darr_f = self.mpi_dtype.Create_darray(size, rank,
@@ -738,7 +738,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
 
         # Note: np.sum() returns 0 for length-zero array
         ret = np.array(np.sum(self.local_array[r,c]))
-        self.context.mpi_comm.Allreduce(ret.copy(), ret, MPI.SUM)
+        self.context.comm.Allreduce(ret.copy(), ret, MPI.SUM)
 
         return ret
 
@@ -766,7 +766,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         """
         # Broadcast if rank is not set.
         if rank is not None:
-            comm = context.mpi_comm if context else _context.mpi_comm
+            comm = context.comm if context else _context.comm
 
             # Double check that rank is valid.
             if rank < 0 or rank >= comm.size:
@@ -820,7 +820,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         if (self.shape[0] == 0) or (self.shape[1] == 0):
             return
 
-        self._darr_f.Pack(mat, self.local_array[:], 0, self.context.mpi_comm)
+        self._darr_f.Pack(mat, self.local_array[:], 0, self.context.comm)
 
 
     def to_global_array(self, rank=None):
@@ -843,7 +843,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         if (self.shape[0] == 0) or (self.shape[1] == 0):
             return np.zeros(self.shape, dtype=self.dtype)
 
-        comm = self.context.mpi_comm
+        comm = self.context.comm
 
         bcast = False
         if rank is None:
@@ -990,7 +990,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         if axis == {0, 1}:
             local_sum = self.local_array.sum()
             local_sum = np.array([local_sum], dtype=self.dtype)
-            self.context.mpi_comm.Allreduce(MPI.IN_PLACE, local_sum, MPI.SUM)
+            self.context.comm.Allreduce(MPI.IN_PLACE, local_sum, MPI.SUM)
             return local_sum[0]
 
         elif axis == {0} or axis == {1}:
@@ -1246,7 +1246,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         scol = scol if scol >= 0 else scol + Ncol
         scol = max(0, scol)
         scol = min(scol, Ncol)
-        if self.context.mpi_comm.rank == rank:
+        if self.context.comm.rank == rank:
             if not (a.ndim == 1 or a.ndim == 2):
                 raise ScalapyException('Unsupported high dimensional array.')
 
@@ -1268,10 +1268,10 @@ class DistributedMatrix(MatrixLikeAlgebra):
         else:
             m, n = 1, 1
 
-        asrow = self.context.mpi_comm.bcast(asrow, root=rank)
-        ascol = self.context.mpi_comm.bcast(ascol, root=rank)
-        m = self.context.mpi_comm.bcast(m, root=rank) # number of rows to copy
-        n = self.context.mpi_comm.bcast(n, root=rank) # number of columes to copy
+        asrow = self.context.comm.bcast(asrow, root=rank)
+        ascol = self.context.comm.bcast(ascol, root=rank)
+        m = self.context.comm.bcast(m, root=rank) # number of rows to copy
+        n = self.context.comm.bcast(n, root=rank) # number of columes to copy
 
         if m == 0 or n == 0:
             return self
@@ -1287,13 +1287,13 @@ class DistributedMatrix(MatrixLikeAlgebra):
         rn = n - (bc - 1) * bn # remained number of columes of the last block
 
         # due to bugs in scalapy, it is needed to first init an process context here
-        ProcessContext([1, self.context.mpi_comm.size], comm=self.context.mpi_comm) # process context
+        ProcessContext([1, self.context.comm.size], comm=self.context.comm) # process context
 
         for bri in range(br):
             M = bm if bri != br - 1 else rm
             for bci in range(bc):
                 N = bn if bci != bc - 1 else rn
-                if self.context.mpi_comm.rank == rank:
+                if self.context.comm.rank == rank:
                     pc = ProcessContext([1, 1], comm=MPI.COMM_SELF) # process context
                     desc = self.desc
                     desc[1] = pc.blacs_context
@@ -1346,7 +1346,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         n = max(0, n)
         n = min(n, Ncol - scol)
 
-        if self.context.mpi_comm.rank == rank:
+        if self.context.comm.rank == rank:
             a = np.empty((m, n), dtype=self.dtype, order='F')
         else:
             a = None
@@ -1365,13 +1365,13 @@ class DistributedMatrix(MatrixLikeAlgebra):
         rn = n - (bc - 1) * bn # remained number of columes of the last block
 
         # due to bugs in scalapy, it is needed to first init an process context here
-        ProcessContext([1, self.context.mpi_comm.size], comm=self.context.mpi_comm) # process context
+        ProcessContext([1, self.context.comm.size], comm=self.context.comm) # process context
 
         for bri in range(br):
             M = bm if bri != br - 1 else rm
             for bci in range(bc):
                 N = bn if bci != bc - 1 else rn
-                if self.context.mpi_comm.rank == rank:
+                if self.context.comm.rank == rank:
                     pc = ProcessContext([1, 1], comm=MPI.COMM_SELF) # process context
                     desc = self.desc
                     desc[1] = pc.blacs_context
@@ -1398,7 +1398,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         """True if some MPI processes may contain empty blocks"""
         shape = np.array(self.local_shape, dtype=int)
         out = np.empty_like(shape)
-        self.context.mpi_comm.Allreduce(shape, out, op=MPI.MIN)
+        self.context.comm.Allreduce(shape, out, op=MPI.MIN)
         return np.any(out == 0)
 
     def assert_not_tiny(self, intro="DistributedMatrix"):
@@ -1441,7 +1441,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         dm = cls(global_shape, dtype=dtype, block_shape=block_shape, context=context)
 
         # Open the file, and read out the segments
-        f = MPI.File.Open(dm.context.mpi_comm, filename, MPI.MODE_RDONLY)
+        f = MPI.File.Open(dm.context.comm, filename, MPI.MODE_RDONLY)
         f.Set_view(displacement, dm.mpi_dtype, dm._darr_f, "native")
         f.Read_all(dm.local_array)
         f.Close()
@@ -1462,7 +1462,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
             return
 
         # Open the file, and read out the segments
-        f = MPI.File.Open(self.context.mpi_comm, filename, MPI.MODE_RDWR | MPI.MODE_CREATE)
+        f = MPI.File.Open(self.context.comm, filename, MPI.MODE_RDWR | MPI.MODE_CREATE)
 
         filelength = displacement + mpi3util.type_get_extent(self._darr_f)[1]  # Extent is index 1
 
@@ -1503,7 +1503,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
             context = self.context
 
         # Check that we are redistributing over the same communicator
-        if context.mpi_comm != self.context.mpi_comm:
+        if context.comm != self.context.comm:
             raise ScalapyException("Can only redsitribute over the same MPI communicator.")
 
         dm = DistributedMatrix(self.shape, dtype=self.dtype, block_shape=block_shape, context=context)
