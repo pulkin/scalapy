@@ -165,8 +165,8 @@ def write_matrix(a, f, dataset_name, root=0, memlimit_gb=1.0, nblocks=None):
         # (lri:lrj) = local row ranges processed in this block
         lri = [ np.searchsorted(r,gri,side='left') for r in rindices ]
         lrj = [ np.searchsorted(r,grj,side='left') for r in rindices ]
-        my_lri = lri[a.context.grid_position[0]]
-        my_lrj = lrj[a.context.grid_position[0]]
+        my_lri = lri[a.context.pos[0]]
+        my_lrj = lrj[a.context.pos[0]]
 
         # counts, displs, buffers for mpi_gather operation
         row_counts = [ (j-i) for (i,j) in zip(lri,lrj) ]

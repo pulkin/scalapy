@@ -659,7 +659,7 @@ def qr(a, overwrite_a=True, mode='reduced'):
     tau = np.zeros(numrc(
         rank,
         a.block_shape[1],
-        a.context.grid_position[1],
+        a.context.pos[1],
         a.context.shape[1],
     ), dtype=a.dtype)
 

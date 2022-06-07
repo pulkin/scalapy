@@ -185,7 +185,7 @@ class ProcessContext(object):
         return self.blacs_context.shape
 
     @property
-    def grid_position(self):
+    def pos(self):
         """Process grid position."""
         return self.blacs_context.pos
 
@@ -225,10 +225,10 @@ class ProcessContext(object):
     def __eq__(self, other):
         if not isinstance(other, ProcessContext):
             return False
-        return self.shape == other.shape and self.grid_position == other.grid_position
+        return self.shape == other.shape and self.pos == other.pos
 
     def __repr__(self):
-        return f"ProcessContext(rank={self.mpi_comm.rank}, grid={self.shape}, grid_pos={self.grid_position})"
+        return f"ProcessContext(rank={self.mpi_comm.rank}, grid={self.shape}, grid_pos={self.pos})"
 
 
 initmpi()
@@ -435,7 +435,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         """The shape of the local matrix."""
 
         lshape = tuple(map(blockcyclic.numrc, self.shape,
-                           self.block_shape, self.context.grid_position,
+                           self.block_shape, self.context.pos,
                            self.context.shape))
 
         return tuple(lshape)
@@ -632,7 +632,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         """
         return blockcyclic.indices_rc(self.shape[0],
                                       self.block_shape[0],
-                                      self.context.grid_position[0],
+                                      self.context.pos[0],
                                       self.context.shape[0])
 
 
@@ -641,7 +641,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         """
         return blockcyclic.indices_rc(self.shape[1],
                                       self.block_shape[1],
-                                      self.context.grid_position[1],
+                                      self.context.pos[1],
                                       self.context.shape[1])
 
 
@@ -678,7 +678,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         ri, ci = tuple(map(blockcyclic.indices_rc,
                            self.shape,
                            self.block_shape,
-                           self.context.grid_position,
+                           self.context.pos,
                            self.context.shape))
 
         ri = ri.reshape((-1, 1), order='F')
@@ -717,16 +717,16 @@ class DistributedMatrix(MatrixLikeAlgebra):
         ri, ci = tuple(map(blockcyclic.indices_rc,
                            self.shape,
                            self.block_shape,
-                           self.context.grid_position,
+                           self.context.pos,
                            self.context.shape))
 
         global_index = np.intersect1d(ri, ci)
 
         (rank, local_row_index) = blockcyclic.localize_indices(global_index, self.block_shape[0], self.context.shape[0])
-        assert np.all(rank == self.context.grid_position[0])
+        assert np.all(rank == self.context.pos[0])
 
         (rank, local_col_index) = blockcyclic.localize_indices(global_index, self.block_shape[1], self.context.shape[1])
-        assert np.all(rank == self.context.grid_position[1])
+        assert np.all(rank == self.context.pos[1])
 
         return (global_index, local_row_index, local_col_index)
 
