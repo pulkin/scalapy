@@ -130,6 +130,32 @@ def shape_context(gridshape=None, block_shape=[32, 32]):
     _block_shape = prev_bs
 
 
+def create_1d_comm_group(context, dim):
+    """
+    Assembles all MPI processes along the specified
+    dimension into a separate MPI communicator.
+
+    Parameters
+    ----------
+    context : GridContext
+        The context specifying the process grid.
+    dim : int
+        Dimension to assemble along.
+
+    Returns
+    -------
+    result : MPI.Comm
+        The resulting communicator.
+    """
+    pos = context.pos
+    comm = context.comm
+    if dim == 0:
+        ix = pos[0], slice(None)
+    else:
+        ix = slice(None), pos[1]
+    return comm.Create_group(comm.group.Incl(context.rank_grid[ix]))
+
+
 class ProcessContext(object):
     r"""Stores information about an MPI/BLACS process.
 
@@ -195,18 +221,6 @@ class ProcessContext(object):
 
         # Initialise BLACS context
         self._blacs_context = blacs.GridContext(grid_shape, comm=comm)
-
-        #
-        # As far as I know, BLACS doesn't guarantee any specific association between MPI tasks and grid positions, so
-        # we compute all_grid_positions using MPI_Allgather().
-        #
-        # (Alternate approach: move the call to MPI_Allgather to the all_grid_positions property, and cache the result.
-        # This would have the advantage that MPI_Allgather() only gets called if needed, but the disadvantage that it
-        # would hang if the first call to all_grid_positions() is from a serial context.)
-        #
-
-        self.mpi_comm_row = self.mpi_comm.Create_group(self.mpi_comm.group.Incl(self.all_mpi_ranks[self.grid_position[0], :]))
-        self.mpi_comm_col = self.mpi_comm.Create_group(self.mpi_comm.group.Incl(self.all_mpi_ranks[:, self.grid_position[1]]))
 
     def __eq__(self, other):
         if not isinstance(other, ProcessContext):
@@ -982,7 +996,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         elif axis == {0} or axis == {1}:
             sum_axis = axis.pop()
             free_axis = not sum_axis
-            rc_contexts = self.context.mpi_comm_col, self.context.mpi_comm_row
+            rc_contexts = create_1d_comm_group(self.context.blacs_context, 1), create_1d_comm_group(self.context.blacs_context, 0)
             sum_context = rc_contexts[sum_axis]
             distribution_context = rc_contexts[free_axis]
 
@@ -1014,6 +1028,8 @@ class DistributedMatrix(MatrixLikeAlgebra):
             send_request.Wait()
             distribution_context.Bcast(result, root=0)
             for i in chunk_dtypes:
+                i.Free()
+            for i in rc_contexts:
                 i.Free()
             return result
 
