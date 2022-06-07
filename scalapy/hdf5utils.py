@@ -143,8 +143,8 @@ def write_matrix(a, f, dataset_name, root=0, memlimit_gb=1.0, nblocks=None):
 
         nblocks = (nrows_global + rows_per_block - 1) // rows_per_block
 
-    rindices = [ blockcyclic.indices_rc(nrows_global, a.block_shape[0], p, a.context.grid_shape[0]) for p in xrange(a.context.grid_shape[0]) ]
-    cindices = [ blockcyclic.indices_rc(ncols_global, a.block_shape[1], p, a.context.grid_shape[1]) for p in xrange(a.context.grid_shape[1]) ]
+    rindices = [blockcyclic.indices_rc(nrows_global, a.block_shape[0], p, a.context.shape[0]) for p in xrange(a.context.shape[0])]
+    cindices = [blockcyclic.indices_rc(ncols_global, a.block_shape[1], p, a.context.shape[1]) for p in xrange(a.context.shape[1])]
 
     col_counts = np.array([ len(c) for c in cindices ])
     col_displs = np.concatenate(([0], np.cumsum(col_counts[:-1])))
