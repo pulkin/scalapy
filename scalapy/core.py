@@ -223,9 +223,7 @@ class ProcessContext(object):
         self._blacs_context = blacs.GridContext(grid_shape, comm=comm)
 
     def __eq__(self, other):
-        if not isinstance(other, ProcessContext):
-            return False
-        return self.shape == other.shape and self.pos == other.pos
+        return self.blacs_context == other.blacs_context
 
     def __repr__(self):
         return f"ProcessContext(rank={self.comm.rank}, grid={self.shape}, grid_pos={self.pos})"

@@ -137,3 +137,14 @@ class GridContext:
 
     def __str__(self):
         return f"GridContext-{self.handle}"
+
+    def __eq__(self, other):
+        """
+        Context compatibility. Note that it does not necessarily
+        mean that the two contexts are the same; it rather means
+        that the two process grids are the same.
+        """
+        try:
+            return np.array_equal(self.rank_grid, other.rank_grid)
+        except AttributeError:
+            return False
