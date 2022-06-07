@@ -171,8 +171,8 @@ def write_matrix(a, f, dataset_name, root=0, memlimit_gb=1.0, nblocks=None):
         # counts, displs, buffers for mpi_gather operation
         row_counts = [ (j-i) for (i,j) in zip(lri,lrj) ]
         row_displs = np.concatenate(([0], np.cumsum(row_counts[:-1])))
-        mpi_counts = np.array([ (row_counts[p]*col_counts[q]) for (p,q) in a.context.all_grid_positions ])
-        mpi_displs = np.array([ (row_displs[p]*ncols_global + row_counts[p]*col_displs[q]) for (p,q) in a.context.all_grid_positions ])
+        mpi_counts = np.array([(row_counts[p]*col_counts[q]) for (p,q) in a.context.pos_all])
+        mpi_displs = np.array([(row_displs[p]*ncols_global + row_counts[p]*col_displs[q]) for (p,q) in a.context.pos_all])
         rbuf = np.zeros((grj-gri)*ncols_global, dtype=a.dtype) if (mpi_rank==root) else None
         sbuf = np.reshape(a.local_array[my_lri:my_lrj,:], (-1,))   # note: zero-copy
 
@@ -205,7 +205,7 @@ def write_matrix(a, f, dataset_name, root=0, memlimit_gb=1.0, nblocks=None):
         # Step 1: unpack rows, leaving columns in packed form
         #
         rbuf2 = np.zeros((grj-gri,ncols_global), dtype=a.dtype)
-        for (rk,(p,q)) in enumerate(a.context.all_grid_positions):
+        for (rk,(p,q)) in enumerate(a.context.pos_all):
             # source array is an m-by-n matrix at displacement d
             (m,n,d) = (row_counts[p], col_counts[q], mpi_displs[rk])
 

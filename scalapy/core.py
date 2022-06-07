@@ -204,7 +204,7 @@ class ProcessContext(object):
 
 
     @property
-    def all_grid_positions(self):
+    def pos_all(self):
         """Returns shape (mpi_comm_size,2) array, such that (arr[i,0], arr[i,1]) gives the grid position of mpi task i."""
         return self.blacs_context.pos_all
 
