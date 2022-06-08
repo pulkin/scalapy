@@ -1,12 +1,18 @@
-from common import mpi_rank, mpi_comm, assert_mpi_env, random_distributed
+from common import mpi_rank, mpi_comm, assert_mpi_env, random_distributed, random
 
 import numpy as np
+from scipy import sparse
 import pytest
 
 from scalapy import core
 
 assert_mpi_env(size=4)
 test_context = {"block_shape": (3, 3)}
+sparse_sample = sparse.csr_array((
+    [1., 2., 3.],  # data
+    [0, 4, 4],  # indices
+    [0, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],  # index pointers
+), shape=(14, 15))
 
 
 def test_dm_init():
@@ -84,3 +90,60 @@ def test_sum(shape=(13, 17), dtype=np.float64):
         np.testing.assert_allclose(a_distributed.sum(0), a.sum(0))
         np.testing.assert_allclose(a_distributed.sum(1), a.sum(1))
         np.testing.assert_allclose(a_distributed.sum(), a.sum())
+
+
+def test_from_sparse():
+    """Tests conversion from sparse"""
+    with core.shape_context(**test_context):
+        a = sparse_sample.toarray()
+        a_distributed = core.fromsparse_csr(sparse_sample)
+        test = a_distributed.numpy()
+        np.testing.assert_equal(test, a)
+
+
+def test_auto():
+    """Tests core.array"""
+    with core.shape_context(**test_context):
+        # numpy
+        a = random((15, 16), float)
+        mpi_comm.Bcast(a, 0)
+        test = core.array(a)
+        np.testing.assert_equal(test.numpy(), a)
+
+        # sparse
+        test = core.array(sparse_sample)
+        np.testing.assert_equal(test.numpy(), sparse_sample.toarray())
+
+        # distributed
+        a_distributed, a = random_distributed((15, 16), float)
+        test = core.array(a_distributed)
+        np.testing.assert_equal(test.numpy(), a)
+        assert test is not a_distributed
+
+        # distributed with a different block shape
+        with core.shape_context(block_shape=(4, 4)):
+            a_distributed, a = random_distributed((15, 16), float)
+        test = core.array(a_distributed)
+        np.testing.assert_equal(test.numpy(), a)
+
+        # distributed with an equivalent context
+        context = core.GridContext(shape=(2, 2), comm=core.default_grid_context.comm)
+        with core.shape_context(context=context):
+            a_distributed, a = random_distributed((15, 16), float)
+        test = core.array(a_distributed)
+        np.testing.assert_equal(test.numpy(), a)
+
+        # distributed with a different context
+        context = core.GridContext(shape=(4, 1), comm=core.default_grid_context.comm)
+        with core.shape_context(context=context):
+            a_distributed, a = random_distributed((15, 16), float)
+        test = core.array(a_distributed)
+        np.testing.assert_equal(test.numpy(), a)
+
+        # distributed with a different MPI comm
+        comm = mpi_comm.Create_group(mpi_comm.group.Incl([3, 2, 0, 1]))
+        context = core.GridContext(comm=comm)
+        with core.shape_context(context=context):
+            a_distributed, a = random_distributed((15, 16), float)
+        with pytest.raises(ValueError):
+            core.array(a_distributed)

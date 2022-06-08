@@ -145,6 +145,6 @@ class GridContext:
         that the two process grids are the same.
         """
         try:
-            return np.array_equal(self.rank_grid, other.rank_grid)
+            return self.comm is other.comm and np.array_equal(self.rank_grid, other.rank_grid)
         except AttributeError:
             return False

@@ -37,7 +37,7 @@ from contextlib import contextmanager
 
 from numbers import Number
 import numpy as np
-
+from scipy import sparse
 from mpi4py import MPI
 
 from . import blockcyclic
@@ -1599,7 +1599,44 @@ def fromnumpy(mat, rank=None, out=None):
     return out
 
 
-def matrix(source, rank=None):
+def fromsparse_csr(source, rank=None, out=None):
+    """
+    Distributes a sparse CSR matrix.
+
+    Parameters
+    ----------
+    source : sparse.csr_matrix
+        The sparse matrix to distribute.
+    rank : int
+        Indicates that the source object is only available
+        in the process specified by this rank.
+    out : DistributedMatrix
+        The output to write to.
+
+    Returns
+    -------
+    out : DistributedMatrix
+        The resulting distributed matrix.
+    """
+    comm = default_grid_context.comm
+    # just broadcast the entire sparse matrix which is, presumably, not too large
+    if rank is not None:
+        source = source if rank == comm.rank else None
+        source = comm.bcast(source, rank)
+
+    if out is None:
+        out = DistributedMatrix(source.shape, source.dtype.type)
+    else:
+        if out.shape != source.shape:
+            raise ValueError(f"out.shape mismatch: expected {source.shape}, found {out.shape}")
+        if out.dtype != source.dtype:
+            raise ValueError(f"out.dtype mismatch: expected {source.dtype}, found {out.dtype}")
+
+    source[out.row_indices(), :][:, out.col_indices()].toarray(out=out.local_array)
+    return out
+
+
+def array(source, rank=None):
     """
     Converts input to a distributed matrix.
 
@@ -1616,6 +1653,28 @@ def matrix(source, rank=None):
     out : DistributedMatrix
         The resulting distributed matrix.
     """
-    if rank is None or default_grid_context.comm.rank == rank:
-        source = np.array(source)
-    return fromnumpy(source, rank=rank)
+    comm = default_grid_context.comm
+    # broadcast input type but not the input itself
+    if rank is None:
+        source_type = type(source)
+    else:
+        source_type = comm.bcast(type(source), rank)
+
+    if issubclass(source_type, DistributedMatrix):
+        if rank is not None:
+            raise ValueError(f"input is distributed and rank is not None: rank={rank}")
+        if source.context == default_grid_context and source.block_shape == default_block_shape:  # contexts are fully compatible
+            return source.copy()
+        elif source.context.comm is comm:  # context needs an update
+            return source.redistribute(block_shape=default_block_shape, context=default_grid_context)
+        else:
+            raise ValueError(f"the input (distributed matrix) is associated with a different comm {source.context.comm}"
+                             f" vs default (assumed) comm {comm}")
+
+    elif issubclass(source_type, sparse.csr_matrix):
+        return fromsparse_csr(source, rank=rank)
+
+    else:  # try converting to numpy and assembling a distributed matrix
+        if rank is None or default_grid_context.comm.rank == rank:
+            source = np.asanyarray(source)
+        return fromnumpy(source, rank=rank)
