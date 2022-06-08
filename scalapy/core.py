@@ -352,7 +352,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
 
         ## Check and set data type
         if dtype not in list(typemap.keys()):
-            raise Exception("Requested dtype not supported by Scalapack.")
+            raise Exception(f"dtype={dtype} not supported by Scalapack.")
 
         self._dtype = dtype
 
@@ -1533,10 +1533,10 @@ def fromnumpy(mat, rank=None, out=None):
     mat : np.ndarray
         The matrix to distribute.
     rank : int
-        Indicates that the matrix `a` is only available
+        Indicates that the matrix `mat` is only available
         in the process specified by this rank.
     out : DistributedMatrix
-        The output to use.
+        The output to write to.
 
     Returns
     -------
