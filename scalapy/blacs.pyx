@@ -136,7 +136,8 @@ class GridContext:
             pass
 
     def __str__(self):
-        return f"GridContext-{self.handle}"
+        r, c = self.shape
+        return f"GridContext{self.handle}({r}x{c} processes)"
 
     def __eq__(self, other):
         """

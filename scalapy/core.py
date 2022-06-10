@@ -730,6 +730,9 @@ class DistributedMatrix(MatrixLikeAlgebra):
             assert self.block_shape == x.block_shape, f"block_shape mismatch: {self.block_shape} vs {x.block_shape}"
             assert self.context == x.context, f"context mismatch: {self.context} vs {x.context}"
 
+    def __str__(self):
+        return f"{self.__class__.__name__} with shape={self.shape} and dtype={self.dtype} distributed over {self.context})"
+
     def __iadd__(self, x, np_op=np.ndarray.__iadd__, op_inplace=True):
         if isinstance(x, DistributedMatrix):
             if self.shape != x.shape:
