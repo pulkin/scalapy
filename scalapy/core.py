@@ -393,6 +393,11 @@ class DistributedMatrix(MatrixLikeAlgebra):
         # Create the MPI distributed datatypes
         self._mk_mpi_dtype()
 
+    def __del__(self):
+        try:  # TODO: not careful enough in case some attributes exist while others not
+            self._free_mpi_dtype()
+        except AttributeError:
+            pass
 
     def _mkdesc(self):
         # Make the Scalapack array descriptor
@@ -443,6 +448,10 @@ class DistributedMatrix(MatrixLikeAlgebra):
                                                              self.block_shape, self.context.shape,
                                                              MPI.ORDER_F).Commit() for ri in range(size) ]
 
+    def _free_mpi_dtype(self):
+        for i in (self._darr_f, self._darr_c, *self._darr_list):
+            if i:
+                i.Free()
 
     @classmethod
     def empty_like(cls, mat):
