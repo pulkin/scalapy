@@ -198,7 +198,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
 
     Parameters
     ----------
-    global_shape : list of integers
+    shape : list of integers
         The size of the global matrix eg. ``[Nr, Nc]``.
     dtype : np.dtype, optional
         The datatype of the array. See `Notes`_ for the supported types.
@@ -216,7 +216,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
     dtype
     mpi_dtype
     sc_dtype
-    global_shape
+    shape
     local_shape
     block_shape
 
@@ -345,7 +345,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         """The blocksize for the matrix."""
         return self._block_shape
 
-    def __init__(self, global_shape, dtype=np.float64, block_shape=None, context=None):
+    def __init__(self, shape, dtype=np.float64, block_shape=None, context=None):
         r"""Initialise an empty DistributedMatrix.
 
         """
@@ -357,10 +357,10 @@ class DistributedMatrix(MatrixLikeAlgebra):
         self._dtype = dtype
 
         ## Check and set global_shape
-        if not _chk_2d_size(global_shape, positive=False):
+        if not _chk_2d_size(shape, positive=False):
             raise ScalapyException("Array global shape invalid.")
 
-        self._global_shape = tuple(global_shape)
+        self._global_shape = tuple(shape)
 
         ## Check and set default block_shape
         if not default_block_shape and not block_shape:
