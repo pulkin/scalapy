@@ -193,6 +193,204 @@ class MatrixLikeAlgebra:
         raise NotImplementedError
 
 
+def array(source, rank=None):
+    """
+    Converts input to a distributed matrix.
+
+    Parameters
+    ----------
+    source
+        The source object.
+    rank : int
+        Indicates that the input is only available
+        in the process specified by this rank.
+
+    Returns
+    -------
+    out : DistributedMatrix
+        The resulting distributed matrix.
+    """
+    comm = default_grid_context.comm
+    # broadcast input type but not the input itself
+    if rank is None:
+        source_type = type(source)
+    else:
+        source_type = comm.bcast(type(source), rank)
+
+    if issubclass(source_type, DistributedMatrix):
+        if rank is not None:
+            raise ValueError(f"input is distributed and rank is not None: rank={rank}")
+        if source.context == default_grid_context and source.block_shape == default_block_shape:  # contexts are fully compatible
+            return source.copy()
+        elif source.context.comm is comm:  # context needs an update
+            return source.redistribute(block_shape=default_block_shape, context=default_grid_context)
+        else:
+            raise ValueError(f"the input (distributed matrix) is associated with a different comm {source.context.comm}"
+                             f" vs default (assumed) comm {comm}")
+
+    elif issubclass(source_type, sparse.csr_matrix):
+        return fromsparse_csr(source, rank=rank)
+
+    else:  # try converting to numpy and assembling a distributed matrix
+        if rank is None or default_grid_context.comm.rank == rank:
+            source = np.asanyarray(source)
+        return fromnumpy(source, rank=rank)
+
+
+def empty(shape, dtype=float, **kwargs):
+    """
+    Empty distributed matrix.
+
+    Parameters
+    ----------
+    shape : tuple
+        Matrix shape.
+    dtype
+        Matrix data type.
+    kwargs
+        Other arguments to pass to the constructor.
+
+    Returns
+    -------
+    result : DistributedMatrix
+        The resulting distributed matrix.
+    """
+    return DistributedMatrix(shape, dtype=dtype, **kwargs)
+
+
+def empty_like(mat, **kwargs):
+    """
+    Empty distributed matrix derived from the input.
+
+    Parameters
+    ----------
+    mat : DistributedMatrix
+        The matrix to derive from.
+    kwargs
+        Matrix parameters to update.
+
+    Returns
+    -------
+    result : DistributedMatrix
+        The derived matrix.
+    """
+    derived = {"shape": mat.shape, "dtype": mat.dtype, "block_shape": mat.block_shape, "context": mat.context}
+    derived.update(kwargs)
+    return DistributedMatrix(**derived)
+
+
+def zeros(shape, dtype=float, **kwargs):
+    """
+    Distributed matrix filled with zeros.
+
+    Parameters
+    ----------
+    shape : tuple
+        Global matrix shape.
+    dtype
+        Matrix data type.
+    kwargs
+        Other arguments to pass to the constructor.
+
+    Returns
+    -------
+    result : DistributedMatrix
+        The resulting zero-filled distributed matrix.
+    """
+    result = empty(shape, dtype=dtype, **kwargs)
+    result.local_array[:] = 0
+    return result
+
+
+def zeros_like(mat, **kwargs):
+    """
+    Zero-filled distributed matrix derived from the input.
+
+    Parameters
+    ----------
+    mat : DistributedMatrix
+        The matrix to derive from.
+    kwargs
+        Matrix parameters to update.
+
+    Returns
+    -------
+    result : DistributedMatrix
+        The derived matrix filled with zeros.
+    """
+    result = empty_like(mat, **kwargs)
+    result.local_array[:] = 0
+    return result
+
+
+def transpose(mat, hconj=False):
+    """
+    Transpose the matrix.
+
+    Parameters
+    ----------
+    mat : DistributedMatrix
+        The matrix to transpose.
+    hconj : bool
+        If True, performs Hermitian conjugation
+        (i.e. transpose of complex-conjugate).
+
+    Returns
+    -------
+    result : DistributedMatrix
+        The resulting transposed matrix.
+    """
+    result = empty_like(mat, shape=mat.shape[::-1])
+    args = [*result.shape, 1.0, mat, 0.0, result]
+    call_table = {('S', False): (ll.pstran, args),
+                  ('D', False): (ll.pdtran, args),
+                  ('S', True): (ll.pstran, args),
+                  ('D', True): (ll.pdtran, args),
+                  ('C', False): (ll.pctranu, args),
+                  ('Z', False): (ll.pztranu, args),
+                  ('C', True): (ll.pctranc, args),
+                  ('Z', True): (ll.pztranc, args)}
+    func, args = call_table[mat.sc_dtype, hconj]
+    func(*args)
+    return result
+
+
+def conj(mat):
+    """
+    Complex conjugate of the matrix.
+
+    Parameters
+    ----------
+    mat : DistributedMatrix
+        The matrix to conjugate.
+
+    Returns
+    -------
+    result : DistributedMatrix
+        The resulting matrix.
+    """
+    result = empty_like(mat)
+    result.local_array[:] = mat.local_array.conj()
+    return result
+
+
+def hconj(mat):
+    """
+    Hermitian conjugate of the matrix.
+
+    Parameters
+    ----------
+    mat : DistributedMatrix
+        The matrix to conjugate.
+
+    Returns
+    -------
+    result : DistributedMatrix
+        The resulting matrix.
+    """
+    return transpose(mat, hconj=True)
+
+
 class DistributedMatrix(MatrixLikeAlgebra):
     r"""A matrix distributed over multiple MPI processes.
 
@@ -452,24 +650,6 @@ class DistributedMatrix(MatrixLikeAlgebra):
         for i in (self._darr_f, self._darr_c, *self._darr_list):
             if i:
                 i.Free()
-
-    @classmethod
-    def empty_trans(cls, mat):
-        r"""Create a DistributedMatrix, with the same blocking
-        but transposed shape as `mat`.
-
-        Parameters
-        ----------
-        mat : DistributedMatrix
-            The matrix to operate.
-
-        Returns
-        -------
-        tmat : DistributedMatrix
-        """
-        return cls([mat.shape[1], mat.shape[0]], block_shape=mat.block_shape,
-                   dtype=mat.dtype, context=mat.context)
-
 
     @classmethod
     def identity(cls, n, dtype=np.float64, block_shape=None, context=None):
@@ -1340,77 +1520,20 @@ class DistributedMatrix(MatrixLikeAlgebra):
 
         return dm
 
-
-    def transpose(self):
-        """Transpose the distributed matrix."""
-
-        trans = DistributedMatrix.empty_trans(self)
-
-        args = [self.shape[1], self.shape[0], 1.0, self, 0.0, trans]
-
-        call_table = {'S': (ll.pstran, args),
-                      'D': (ll.pdtran, args),
-                      'C': (ll.pctranu, args),
-                      'Z': (ll.pztranu, args)}
-
-        func, args = call_table[self.sc_dtype]
-        func(*args)
-
-        return trans
-
+    transpose = transpose
+    conj = conj
+    hconj = hconj
 
     @property
     def T(self):
-        """Transpose the distributed matrix."""
         return self.transpose()
-
-
-    def conj(self):
-        """Complex conjugate the distributed matrix."""
-
-        # if real
-        if self.sc_dtype in ['S', 'D']:
-            return self
-
-        # if complex
-        cj = empty_like(self)
-        cj.local_array[:] = self.local_array.conj()
-
-        return cj
-
 
     @property
     def C(self):
-        """Complex conjugate the distributed matrix."""
         return self.conj()
-
-
-    def hconj(self):
-        """Hermitian conjugate the distributed matrix, i.e., transpose
-        and complex conjugate the distributed matrix."""
-
-        # if real
-        if self.sc_dtype in ['S', 'D']:
-            return self.transpose()
-
-        # if complex
-        hermi = DistributedMatrix.empty_trans(self)
-
-        args = [self.shape[1], self.shape[0], 1.0, self, 0.0, hermi]
-
-        call_table = {'C': (ll.pctranc, args),
-                      'Z': (ll.pztranc, args)}
-
-        func, args = call_table[self.sc_dtype]
-        func(*args)
-
-        return hermi
-
 
     @property
     def H(self):
-        """Hermitian conjugate the distributed matrix, i.e., transpose
-        and complex conjugate the distributed matrix."""
         return self.hconj()
 
 
@@ -1626,133 +1749,3 @@ def fromsparse_csr(source, rank=None, out=None):
 
     source[out.row_indices(), :][:, out.col_indices()].toarray(out=out.local_array)
     return out
-
-
-def array(source, rank=None):
-    """
-    Converts input to a distributed matrix.
-
-    Parameters
-    ----------
-    source
-        The source object.
-    rank : int
-        Indicates that the input is only available
-        in the process specified by this rank.
-
-    Returns
-    -------
-    out : DistributedMatrix
-        The resulting distributed matrix.
-    """
-    comm = default_grid_context.comm
-    # broadcast input type but not the input itself
-    if rank is None:
-        source_type = type(source)
-    else:
-        source_type = comm.bcast(type(source), rank)
-
-    if issubclass(source_type, DistributedMatrix):
-        if rank is not None:
-            raise ValueError(f"input is distributed and rank is not None: rank={rank}")
-        if source.context == default_grid_context and source.block_shape == default_block_shape:  # contexts are fully compatible
-            return source.copy()
-        elif source.context.comm is comm:  # context needs an update
-            return source.redistribute(block_shape=default_block_shape, context=default_grid_context)
-        else:
-            raise ValueError(f"the input (distributed matrix) is associated with a different comm {source.context.comm}"
-                             f" vs default (assumed) comm {comm}")
-
-    elif issubclass(source_type, sparse.csr_matrix):
-        return fromsparse_csr(source, rank=rank)
-
-    else:  # try converting to numpy and assembling a distributed matrix
-        if rank is None or default_grid_context.comm.rank == rank:
-            source = np.asanyarray(source)
-        return fromnumpy(source, rank=rank)
-
-
-def empty(shape, dtype=float, **kwargs):
-    """
-    Empty distributed matrix.
-
-    Parameters
-    ----------
-    shape : tuple
-        Matrix shape.
-    dtype
-        Matrix data type.
-    kwargs
-        Other arguments to pass to the constructor.
-
-    Returns
-    -------
-    result : DistributedMatrix
-        The resulting distributed matrix.
-    """
-    return DistributedMatrix(shape, dtype=dtype, **kwargs)
-
-
-def empty_like(mat, **kwargs):
-    """
-    Empty distributed matrix derived from the input.
-
-    Parameters
-    ----------
-    mat : DistributedMatrix
-        The matrix to derive from.
-    kwargs
-        Matrix parameters to update.
-
-    Returns
-    -------
-    result : DistributedMatrix
-        The derived matrix.
-    """
-    derived = {"shape": mat.shape, "dtype": mat.dtype, "block_shape": mat.block_shape, "context": mat.context}
-    derived.update(kwargs)
-    return DistributedMatrix(**derived)
-
-
-def zeros(shape, dtype=float, **kwargs):
-    """
-    Distributed matrix filled with zeros.
-
-    Parameters
-    ----------
-    shape : tuple
-        Global matrix shape.
-    dtype
-        Matrix data type.
-    kwargs
-        Other arguments to pass to the constructor.
-
-    Returns
-    -------
-    result : DistributedMatrix
-        The resulting zero-filled distributed matrix.
-    """
-    result = empty(shape, dtype=dtype, **kwargs)
-    result.local_array[:] = 0
-    return result
-
-
-def zeros_like(mat, **kwargs):
-    """
-    Zero-filled distributed matrix derived from the input.
-
-    Parameters
-    ----------
-    mat : DistributedMatrix
-        The matrix to derive from.
-    kwargs
-        Matrix parameters to update.
-
-    Returns
-    -------
-    result : DistributedMatrix
-        The derived matrix filled with zeros.
-    """
-    result = empty_like(mat, **kwargs)
-    result.local_array[:] = 0
-    return result
