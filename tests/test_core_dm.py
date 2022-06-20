@@ -92,6 +92,19 @@ def test_sum(shape=(13, 17), dtype=np.float64):
         np.testing.assert_allclose(a_distributed.sum(), a.sum())
 
 
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("np_op,spy_op", [
+    (np.ndarray.min, core.DistributedMatrix.min),
+    (np.ndarray.max, core.DistributedMatrix.max),
+])
+def test_min(dtype, np_op, spy_op, shape=(18, 14)):
+    """Test min-max reduction"""
+    with core.shape_context(**test_context):
+        a_distributed, a = random_distributed(shape, dtype)
+
+        np.testing.assert_equal(np_op(a), spy_op(a_distributed))
+
+
 def test_from_sparse():
     """Tests conversion from sparse"""
     with core.shape_context(**test_context):

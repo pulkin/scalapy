@@ -32,7 +32,6 @@ Classes
     ScalapackException
 
 """
-from __future__ import print_function, division, absolute_import
 from contextlib import contextmanager
 
 from numbers import Number
@@ -44,6 +43,7 @@ from . import blockcyclic
 from .blacs import GridContext
 from . import mpi3util
 from . import lowlevel as ll
+from .util import real_equiv
 
 
 class ScalapyException(Exception):
@@ -474,6 +474,32 @@ def identity_like(mat, **kwargs):
         The resulting matrix.
     """
     return eye_like(mat, 0, **kwargs)
+
+
+def absolute(mat, out=None):
+    """
+    Absolute of a DistributedMatrix.
+
+    Parameters
+    ----------
+    mat : DistributedMatrix
+        The matrix to take absolute of.
+    out : DistributedMatrix
+        The output matrix.
+
+    Returns
+    -------
+    result : DistributedMatrix
+        The resulting matrix.
+    """
+    if out is None:
+        out = empty_like(mat)
+    else:
+        mat.assert_same_distribution(out)
+        if mat.shape != out.shape:
+            raise ValueError(f"out.shape = {out.shape} != mat.shape = {mat.shape}")
+    out.local_array[:] = np.absolute(mat.local_array)
+    return out
 
 
 class DistributedMatrix(MatrixLikeAlgebra):
@@ -1571,9 +1597,20 @@ class DistributedMatrix(MatrixLikeAlgebra):
 
         return dm
 
+    def min(self, op=np.ndarray.min, mpi_op=MPI.MIN):
+        """Minimum of a matrix."""
+        buffer = np.empty(1, dtype=real_equiv(self.dtype))
+        buffer[:] = op(self.local_array)
+        self.context.comm.Allreduce(MPI.IN_PLACE, buffer, op=mpi_op)
+        return buffer[0]
+
+    def max(self):
+        return self.min(op=np.ndarray.max, mpi_op=MPI.MAX)
+
     transpose = transpose
     conj = conj
     hconj = hconj
+    abs = absolute
 
     @property
     def T(self):

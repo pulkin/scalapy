@@ -49,6 +49,7 @@ def test_identity(n=12):
     (np.conj, core.conj, (17, 8)),
     (np_eye_like, core.eye_like, (17, 8)),
     (np_identity_like, core.identity_like, (10, 10)),
+    (np.absolute, core.absolute, (15, 20))
 ])
 def test_mat_op(dtype, np_op, spy_op, shape):
     with core.shape_context(**test_context):
