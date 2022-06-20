@@ -35,7 +35,7 @@ def _pxxxevr(jobz, erange, uplo, A, vl, vu, il, iu):
     n = A.shape[0]
 
     w = np.empty(n, dtype=util.real_equiv(A.dtype))
-    Z = core.DistributedMatrix.empty_like(A)
+    Z = core.empty_like(A)
 
     args = [jobz, erange, uplo, n, A, vl, vu, il, iu, w, Z]
 
@@ -56,7 +56,7 @@ def _pxxxgvx(ibtype, jobz, erange, uplo, A, B, vl, vu, il, iu, abstol=0.0, orfac
     N = A.shape[0]
 
     w = np.zeros(N, dtype=util.real_equiv(A.dtype))
-    Z = core.DistributedMatrix.empty_like(A)
+    Z = core.empty_like(A)
 
     # Construct the arguments list for the first part
     args1 = [ibtype, jobz, erange, uplo, N, A, B, vl, vu, il, iu, abstol, w, orfac, Z]
@@ -547,7 +547,7 @@ def pinv(A, overwrite_a=True):
     M, N = A.shape
 
     # distributed matrix which contains an identity matrix in the first M rows
-    B = core.DistributedMatrix([max(M, N), M], dtype=A.dtype, block_shape=A.block_shape, context=A.context)
+    B = core.zeros_like(A, shape=[max(M, N), M])
     (g,r,c) = B.local_diagonal_indices(allow_non_square=True)
     B.local_array[r,c] = 1.0
 
@@ -776,7 +776,7 @@ def copy(a, which=None, out=None):
         The resulting copy.
     """
     if out is None:
-        out = core.DistributedMatrix.zeros_like(a)
+        out = core.zeros_like(a)  # TODO: tests not passing w empty_like
     assert a.shape == out.shape, f'out shape mismatch: {out.shape} vs {a.shape} (expected)'
 
     m, n = a.shape

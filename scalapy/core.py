@@ -383,9 +383,9 @@ class DistributedMatrix(MatrixLikeAlgebra):
         self._loccal_empty = True if self.local_shape[0] == 0 or self.local_shape[1] == 0 else False
         if self._loccal_empty:
             # as f2py can not handle zero sized array, we have to create an non-empty local array
-            self._local_array = np.zeros(1, dtype=dtype)
+            self._local_array = np.empty(1, dtype=dtype)
         else:
-            self._local_array = np.zeros(self.local_shape, order='F', dtype=dtype)
+            self._local_array = np.empty(self.local_shape, order='F', dtype=dtype)
 
         # Create the descriptor
         self._mkdesc()
@@ -454,25 +454,6 @@ class DistributedMatrix(MatrixLikeAlgebra):
                 i.Free()
 
     @classmethod
-    def empty_like(cls, mat):
-        r"""Create a DistributedMatrix, with the same shape and
-        blocking as `mat`.
-
-        Parameters
-        ----------
-        mat : DistributedMatrix
-            The matrix to copy.
-
-        Returns
-        -------
-        cmat : DistributedMatrix
-        """
-        return cls(mat.shape, block_shape=mat.block_shape,
-                   dtype=mat.dtype, context=mat.context)
-    zeros_like = empty_like  # TODO: currently, empty_like is actually zeros_like
-
-
-    @classmethod
     def empty_trans(cls, mat):
         r"""Create a DistributedMatrix, with the same blocking
         but transposed shape as `mat`.
@@ -529,9 +510,8 @@ class DistributedMatrix(MatrixLikeAlgebra):
         -------
         copy : DistributedMatrix
         """
-        cp = DistributedMatrix.empty_like(self)
+        cp = empty_like(self)
         cp.local_array[:] = self.local_array
-
         return cp
 
 
@@ -1393,7 +1373,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
             return self
 
         # if complex
-        cj = DistributedMatrix.empty_like(self)
+        cj = empty_like(self)
         cj.local_array[:] = self.local_array.conj()
 
         return cj
@@ -1690,3 +1670,89 @@ def array(source, rank=None):
         if rank is None or default_grid_context.comm.rank == rank:
             source = np.asanyarray(source)
         return fromnumpy(source, rank=rank)
+
+
+def empty(shape, dtype=float, **kwargs):
+    """
+    Empty distributed matrix.
+
+    Parameters
+    ----------
+    shape : tuple
+        Matrix shape.
+    dtype
+        Matrix data type.
+    kwargs
+        Other arguments to pass to the constructor.
+
+    Returns
+    -------
+    result : DistributedMatrix
+        The resulting distributed matrix.
+    """
+    return DistributedMatrix(shape, dtype=dtype, **kwargs)
+
+
+def empty_like(mat, **kwargs):
+    """
+    Empty distributed matrix derived from the input.
+
+    Parameters
+    ----------
+    mat : DistributedMatrix
+        The matrix to derive from.
+    kwargs
+        Matrix parameters to update.
+
+    Returns
+    -------
+    result : DistributedMatrix
+        The derived matrix.
+    """
+    derived = {"shape": mat.shape, "dtype": mat.dtype, "block_shape": mat.block_shape, "context": mat.context}
+    derived.update(kwargs)
+    return DistributedMatrix(**derived)
+
+
+def zeros(shape, dtype=float, **kwargs):
+    """
+    Distributed matrix filled with zeros.
+
+    Parameters
+    ----------
+    shape : tuple
+        Global matrix shape.
+    dtype
+        Matrix data type.
+    kwargs
+        Other arguments to pass to the constructor.
+
+    Returns
+    -------
+    result : DistributedMatrix
+        The resulting zero-filled distributed matrix.
+    """
+    result = empty(shape, dtype=dtype, **kwargs)
+    result.local_array[:] = 0
+    return result
+
+
+def zeros_like(mat, **kwargs):
+    """
+    Zero-filled distributed matrix derived from the input.
+
+    Parameters
+    ----------
+    mat : DistributedMatrix
+        The matrix to derive from.
+    kwargs
+        Matrix parameters to update.
+
+    Returns
+    -------
+    result : DistributedMatrix
+        The derived matrix filled with zeros.
+    """
+    result = empty_like(mat, **kwargs)
+    result.local_array[:] = 0
+    return result
