@@ -178,4 +178,4 @@ def test_dot_mat_vec(shape, dtype):
         mpi_comm.Bcast(v)
         av = a_distributed @ v
 
-        np.testing.assert_allclose(a @ v, av, atol=1e-6 if dtype in (np.float32, np.complex64) else 1e-12)
+        np.testing.assert_allclose(a @ v, av, rtol=1e-5 if dtype in (np.float32, np.complex64) else 1e-12)
