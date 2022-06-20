@@ -368,9 +368,9 @@ def svd(A, overwrite_a=True, compute_u=True, compute_v=True):
     sizeb = max(m, n)
 
     # distributed matrix which contains the first size columns of U (the left singular vectors)
-    U = core.DistributedMatrix([m, size], dtype=A.dtype, block_shape=A.block_shape, context=A.context)
+    U = core.empty_like(A, shape=[m, size])
     # distributed matrix which contains the first size rows of VT (the right singular vectors)
-    VT = core.DistributedMatrix([size, n], dtype=A.dtype, block_shape=A.block_shape, context=A.context)
+    VT = core.empty_like(A, shape=[size, n])
     # array of size size. Contains the singular values of A sorted in descending order
     s = np.empty(size, dtype=util.real_equiv(A.dtype))
 
@@ -776,7 +776,7 @@ def copy(a, which=None, out=None):
         The resulting copy.
     """
     if out is None:
-        out = core.zeros_like(a)  # TODO: tests not passing w empty_like
+        out = core.zeros_like(a)
     assert a.shape == out.shape, f'out shape mismatch: {out.shape} vs {a.shape} (expected)'
 
     m, n = a.shape
