@@ -237,7 +237,7 @@ def array(source, rank=None):
         return fromnumpy(source, rank=rank)
 
 
-def empty(shape, dtype=float, **kwargs):
+def empty(shape, **kwargs):
     """
     Empty distributed matrix.
 
@@ -245,8 +245,6 @@ def empty(shape, dtype=float, **kwargs):
     ----------
     shape : tuple
         Matrix shape.
-    dtype
-        Matrix data type.
     kwargs
         Other arguments to pass to the constructor.
 
@@ -255,7 +253,7 @@ def empty(shape, dtype=float, **kwargs):
     result : DistributedMatrix
         The resulting distributed matrix.
     """
-    return DistributedMatrix(shape, dtype=dtype, **kwargs)
+    return DistributedMatrix(shape, **kwargs)
 
 
 def empty_like(mat, **kwargs):
@@ -279,7 +277,7 @@ def empty_like(mat, **kwargs):
     return DistributedMatrix(**derived)
 
 
-def zeros(shape, dtype=float, **kwargs):
+def zeros(shape, **kwargs):
     """
     Distributed matrix filled with zeros.
 
@@ -287,8 +285,6 @@ def zeros(shape, dtype=float, **kwargs):
     ----------
     shape : tuple
         Global matrix shape.
-    dtype
-        Matrix data type.
     kwargs
         Other arguments to pass to the constructor.
 
@@ -297,7 +293,7 @@ def zeros(shape, dtype=float, **kwargs):
     result : DistributedMatrix
         The resulting zero-filled distributed matrix.
     """
-    result = empty(shape, dtype=dtype, **kwargs)
+    result = empty(shape, **kwargs)
     result.local_array[:] = 0
     return result
 
@@ -389,6 +385,95 @@ def hconj(mat):
         The resulting matrix.
     """
     return transpose(mat, hconj=True)
+
+
+def eye(n, m=None, k=0, **kwargs):
+    """
+    A matrix with ones on the diagonal and zeros elsewhere.
+
+    Parameters
+    ----------
+    n : int
+        Row count.
+    m : int
+        Column count.
+    k : int
+        Index of the diagonal.
+
+    Returns
+    -------
+    result : DistributedMatrix
+        The resulting matrix.
+    """
+    if m is None:
+        m = n
+    result = zeros((n, m), **kwargs)
+    _, r, _, c = result.local_diagonal_indices(diagonal=k)
+    result.local_array[r, c] = 1
+    return result
+
+
+def eye_like(mat, k=0, **kwargs):
+    """
+    A matrix with ones on the diagonal and zeros elsewhere
+    similar to the input matrix.
+
+    Parameters
+    ----------
+    mat : DistributedMatrix
+        The base matrix.
+    k : int
+        Index of the diagonal.
+    kwargs
+        Other arguments to the DistributedMatrix constructor.
+
+    Returns
+    -------
+    result : DistributedMatrix
+        The resulting matrix with ones on the diagonal.
+    """
+    result = zeros_like(mat, **kwargs)
+    _, r, _, c = result.local_diagonal_indices(diagonal=k)
+    result.local_array[r, c] = 1
+    return result
+
+
+def identity(n, **kwargs):
+    """
+    Identity matrix.
+
+    Parameters
+    ----------
+    n : int
+        Matrix size.
+    kwargs
+        Other arguments to the DistributedMatrix constructor.
+
+    Returns
+    -------
+    result : DistributedMatrix
+        The resulting matrix.
+    """
+    return eye(n, n, 0, **kwargs)
+
+
+def identity_like(mat, **kwargs):
+    """
+    Identity matrix similar to the input matrix.
+
+    Parameters
+    ----------
+    mat : DistributedMatrix
+        The base matrix.
+    kwargs
+        Other arguments to the DistributedMatrix constructor.
+
+    Returns
+    -------
+    result : DistributedMatrix
+        The resulting matrix.
+    """
+    return eye_like(mat, 0, **kwargs)
 
 
 class DistributedMatrix(MatrixLikeAlgebra):
@@ -651,35 +736,6 @@ class DistributedMatrix(MatrixLikeAlgebra):
             if i:
                 i.Free()
 
-    @classmethod
-    def identity(cls, n, dtype=np.float64, block_shape=None, context=None):
-        """Returns distributed n-by-n distributed matrix.
-
-        Parameters
-        ----------
-        n : integer
-           matrix size
-        dtype : np.dtype, optional
-           The datatype of the array.
-           See DistributedMatrix.__init__ docstring for supported types.
-        block_shape: list of integers, optional
-           The blocking size, packed as ``[Br, Bc]``. If ``None`` uses the default blocking
-           (set via :func:`initmpi`).
-        context : ProcessContext, optional
-           The process context. If not set uses the default (recommended).
-        """
-
-        ret = cls(global_shape=(n, n),
-                  dtype=dtype,
-                  block_shape=block_shape,
-                  context=context)
-
-        g, r, c = ret.local_diagonal_indices()
-
-        ret.local_array[r, c] = 1.0
-        return ret
-
-
     def copy(self):
         """Create a copy of this DistributedMatrix.
 
@@ -760,7 +816,7 @@ class DistributedMatrix(MatrixLikeAlgebra):
         return (ri, ci)
 
 
-    def local_diagonal_indices(self, allow_non_square=False):
+    def local_diagonal_indices(self, diagonal=0):
         """Returns triple of 1D arrays (global_index, local_row_index, local_column_index).
 
         Each of these arrays has length equal to the number of elements on the global diagonal
@@ -775,34 +831,29 @@ class DistributedMatrix(MatrixLikeAlgebra):
            A.local_array[local_row_index, local_column_index] += global_index**2
         """
 
-        if (not allow_non_square) and (self.shape[0] != self.shape[1]):
-            #
-            # Attempting to access the "diagonal" of a non-square matrix probably indicates a bug.
-            # Therefore we raise an exception unless the caller sets the allow_non_square flag.
-            #
-            raise RuntimeError('scalapy.core.DistributedMatrix.local_diagonal_indices() called on non-square matrix, and allow_non_square=False')
-
         ri, ci = tuple(map(blockcyclic.indices_rc,
                            self.shape,
                            self.block_shape,
                            self.context.pos,
                            self.context.shape))
 
-        global_index = np.intersect1d(ri, ci)
+        global_row_index = np.intersect1d(ri, ci - diagonal)
+        global_col_index = global_row_index + diagonal
 
-        (rank, local_row_index) = blockcyclic.localize_indices(global_index, self.block_shape[0], self.context.shape[0])
+        (rank, local_row_index) = blockcyclic.localize_indices(global_row_index, self.block_shape[0], self.context.shape[0])
         assert np.all(rank == self.context.pos[0])
 
-        (rank, local_col_index) = blockcyclic.localize_indices(global_index, self.block_shape[1], self.context.shape[1])
+        (rank, local_col_index) = blockcyclic.localize_indices(global_col_index, self.block_shape[1], self.context.shape[1])
         assert np.all(rank == self.context.pos[1])
 
-        return (global_index, local_row_index, local_col_index)
+        return global_row_index, local_row_index, global_col_index, local_col_index
 
 
     def trace(self):
         """Returns global matrix trace (the trace is returned on all ranks)."""
+        # TODO: not tested
 
-        (g,r,c) = self.local_diagonal_indices()
+        _, r, _, c = self.local_diagonal_indices()
 
         # Note: np.sum() returns 0 for length-zero array
         ret = np.array(np.sum(self.local_array[r,c]))

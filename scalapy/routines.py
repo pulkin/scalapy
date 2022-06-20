@@ -547,9 +547,8 @@ def pinv(A, overwrite_a=True):
     M, N = A.shape
 
     # distributed matrix which contains an identity matrix in the first M rows
-    B = core.zeros_like(A, shape=[max(M, N), M])
-    (g,r,c) = B.local_diagonal_indices(allow_non_square=True)
-    B.local_array[r,c] = 1.0
+    B = core.eye_like(A, shape=[max(M, N), M])
+    print(B.numpy())
 
     args = ['N', M, N, M, A, B]
 
