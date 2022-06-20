@@ -107,6 +107,32 @@ def test_dm_np(shape, dtype, op):
             a_distributed * bx
 
 
+@multiple_shape_parameters
+def test_dm_inplace(shape, dtype):
+    """Tests += and such"""
+    with core.shape_context(**test_context):
+        a_distributed, a = random_distributed(shape, dtype)
+        a_distributed += 3
+        a += 3
+
+        np.testing.assert_equal(a_distributed.numpy(), a)
+
+        a_distributed -= 3
+        a -= 3
+
+        np.testing.assert_equal(a_distributed.numpy(), a)
+
+        a_distributed *= 2
+        a *= 2
+
+        np.testing.assert_equal(a_distributed.numpy(), a)
+
+        a_distributed /= 2
+        a /= 2
+
+        np.testing.assert_equal(a_distributed.numpy(), a)
+
+
 @multiple_operators
 def test_dm_dm_fail(op):
     """Tests failing gracefully for non-matching block setup"""

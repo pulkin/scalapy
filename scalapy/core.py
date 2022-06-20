@@ -1009,15 +1009,16 @@ class DistributedMatrix(MatrixLikeAlgebra):
 
         if not op_inplace:
             self.local_array[:] = op_result
+        return self
 
     def __isub__(self, other):
-        self.__iadd__(other, np_op=np.ndarray.__isub__)
+        return self.__iadd__(other, np_op=np.ndarray.__isub__)
 
     def __imul__(self, x):
-        self.__iadd__(x, np_op=np.ndarray.__imul__)
+        return self.__iadd__(x, np_op=np.ndarray.__imul__)
 
     def __itruediv__(self, other):
-        self.__iadd__(other, np_op=np.ndarray.__itruediv__)
+        return self.__iadd__(other, np_op=np.ndarray.__itruediv__)
 
     def __rtruediv__(self, other):
         def _rev_op(a, b):
