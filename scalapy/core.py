@@ -970,6 +970,17 @@ class DistributedMatrix(MatrixLikeAlgebra):
     def __str__(self):
         return f"{self.__class__.__name__} with shape={self.shape} and dtype={self.dtype} distributed over {self.context})"
 
+    def __pos__(self):
+        return self
+
+    def __neg__(self):
+        result = self.copy()
+        np.negative(result.local_array, out=result.local_array)
+        return result
+
+    def __abs__(self):
+        return absolute(self)
+
     def __iadd__(self, x, np_op=np.ndarray.__iadd__, op_inplace=True):
         if isinstance(x, DistributedMatrix):
             if self.shape != x.shape:
@@ -998,11 +1009,6 @@ class DistributedMatrix(MatrixLikeAlgebra):
 
         if not op_inplace:
             self.local_array[:] = op_result
-
-    def __neg__(self):
-        result = self.copy()
-        np.negative(result.local_array, out=result.local_array)
-        return result
 
     def __isub__(self, other):
         self.__iadd__(other, np_op=np.ndarray.__isub__)
@@ -1610,7 +1616,6 @@ class DistributedMatrix(MatrixLikeAlgebra):
     transpose = transpose
     conj = conj
     hconj = hconj
-    abs = absolute
 
     @property
     def T(self):
