@@ -27,6 +27,7 @@ def test_pinv(shape, dtype, rank, pinv):
         a_pinv_distributed = pinv(a_distributed)
         a_pinv = a_pinv_distributed.numpy()[:shape[1]]
 
+        np.testing.assert_equal(a_distributed.numpy(), a, err_msg="input matrix changed")
         np.testing.assert_allclose(a, a @ a_pinv @ a, err_msg="a = a @ p @ a", atol=1e-10)
         np.testing.assert_allclose(a_pinv, a_pinv @ a @ a_pinv, err_msg="p = p @ a @ p", atol=1e-10)
         np.testing.assert_allclose(a_pinv, la.pinv(a))

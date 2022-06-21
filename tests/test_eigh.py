@@ -39,6 +39,8 @@ def test_eigh_generalized(size, dtype, atol):
         vals, vecs_distributed = rt.eigh(a_distributed, b_distributed)
         vecs = vecs_distributed.numpy()
 
+        np.testing.assert_equal(a_distributed.numpy(), a, err_msg="A matrix changed")
+        np.testing.assert_equal(b_distributed.numpy(), b, err_msg="B matrix changed")
         np.testing.assert_allclose(a @ vecs - b @ vecs * vals[None, :], 0, err_msg=f"A @ v - val B @ v = 0", atol=atol)
         np.testing.assert_allclose(vecs.conj().T @ b @ vecs, np.eye(size), err_msg=f"v.T @ b @ v = I", atol=atol)
 

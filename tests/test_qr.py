@@ -23,8 +23,9 @@ def test_qr(shape, dtype):
         q_distributed, r_distributed = rt.qr(a_distributed)
         q = q_distributed.numpy()
         r = r_distributed.numpy()
-
         _q, _r = np.linalg.qr(a)
+
+        np.testing.assert_equal(a_distributed.numpy(), a, err_msg="input matrix changed")
         np.testing.assert_allclose(q.conj().T @ q, np.eye(q.shape[1]), err_msg="orthonormal", atol=1e-14)
         np.testing.assert_allclose(r, np.triu(r), err_msg="upper-triangular")
         np.testing.assert_allclose(q @ r, a, err_msg="Q @ R = A", atol=1e-14)

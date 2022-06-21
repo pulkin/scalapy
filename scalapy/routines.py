@@ -81,7 +81,7 @@ def _pxxxgvx(ibtype, jobz, erange, uplo, A, B, vl, vu, il, iu, abstol=0.0, orfac
     return w, Z, m, nz, info, ifail, iclustr, gap
 
 
-def eigh(A, B=None, lower=True, eigvals_only=False, overwrite_a=True, overwrite_b=True, type_=1, eigbounds=None, eigvals=None):
+def eigh(A, B=None, lower=True, eigvals_only=False, overwrite_a=False, overwrite_b=False, type_=1, eigbounds=None, eigvals=None):
     """Find the eigen-solution of a symmetric/hermitian matrix.
 
     Use ScaLAPACK to compute the eigenvalues and eigenvectors of a distributed
