@@ -483,7 +483,7 @@ def absolute(mat, out=None):
     Parameters
     ----------
     mat : DistributedMatrix
-        The matrix to take absolute of.
+        The matrix to take the absolute value of.
     out : DistributedMatrix
         The output matrix.
 
@@ -493,7 +493,7 @@ def absolute(mat, out=None):
         The resulting matrix.
     """
     if out is None:
-        out = empty_like(mat)
+        out = empty_like(mat, dtype=real_equiv(mat.dtype))
     else:
         mat.assert_same_distribution(out)
         if mat.shape != out.shape:
